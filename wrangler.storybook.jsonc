@@ -1,0 +1,8 @@
+{
+  "name": "storybook-colombia-evaluadora",
+  "compatibility_date": "2026-07-23",
+  "assets": {
+    "directory": "./storybook-static",
+    "not_found_handling": "single-page-application",
+  },
+}

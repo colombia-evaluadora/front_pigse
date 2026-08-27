@@ -1,0 +1,185 @@
+import {
+  ArgTypes,
+  Canvas,
+  Controls,
+  Description,
+  Meta,
+  Primary,
+  Stories,
+  Subtitle,
+  Title,
+} from "@storybook/addon-docs/blocks"
+
+import * as ButtonStories from "./button.stories"
+
+<Meta of={ButtonStories} />
+
+<Title>Button</Title>
+<Subtitle>Disparador de acciones — 5 variants × 8 colors sincronizados con Figma</Subtitle>
+
+---
+
+## Overview
+
+Disparador de acciones. Es el componente principal para ejecutar una
+operación (submit, confirmación, navegación interna, toggle, etc.).
+
+Combina **`variant`** (forma) con **`color`** (tono semántico) para dar
+**5 × 8 = 40 combinaciones** sincronizadas con Figma
+_"Design Tokens — Tailwind Sync"_.
+
+Construido sobre `@base-ui/react/button`.
+
+---
+
+## Playground
+
+<Description of={ButtonStories} />
+
+El playground expone todos los controles. Probá combinaciones de
+`variant × color × size` sin tocar código.
+
+<Primary />
+<Controls />
+
+---
+
+## Cuándo usar
+
+- **Acción primaria** → `variant="fill"` + `color="primary"`. Una por vista, como máximo.
+- **Acción secundaria** → `variant="soft"` u `outline`. Acompaña a la primaria.
+- **Acción destructiva** → `color="destructive"` con fill u outline. Etiqueta explícita ("Eliminar", no "Click aquí").
+- **Bajo énfasis** → `variant="ghost"` (ej. "Cancelar", "Volver").
+- **Navegación in-page** → `variant="link"` o `<a>` con `buttonVariants`.
+
+## Cuándo **no** usar
+
+- **Navegación entre rutas** → usá `<a>` o el router. No semántices un botón para navegar.
+- **Selección de opciones** → `ToggleGroup`, `RadioGroup`, `Select`.
+- **Labels largas** → el texto debe ser accionable y conciso.
+
+---
+
+## Anatomía
+
+```
+[ Ícono opcional ] [ Texto ] [ Ícono opcional ]
+```
+
+- **Ícono izquierdo**: `<span data-icon="inline-start">`
+- **Ícono derecho**: `<span data-icon="inline-end">`
+- El padding se ajusta automáticamente vía las queries `has-data-[icon=...]` de Tailwind.
+
+---
+
+## Variantes y colores
+
+Matriz completa de **5 variants × 8 colores** (40 combinaciones).
+Útil para revisar el contraste en cada tema.
+
+<Canvas of={ButtonStories.Variants} />
+
+---
+
+## Tamaños
+
+Cuatro tamaños con texto + cuatro tamaños solo-ícono.
+
+<Canvas of={ButtonStories.Sizes} />
+
+---
+
+## Con ícono
+
+Soporta íconos a la izquierda (`data-icon="inline-start"`) y a la derecha
+(`data-icon="inline-end"`).
+
+<Canvas of={ButtonStories.WithIcon} />
+
+---
+
+## Estados
+
+### Disabled
+
+`disabled` aplica `pointer-events: none` + opacidad 50%. El cursor pasa a
+`not-allowed` (definido en `index.css`).
+
+<Canvas of={ButtonStories.Disabled} />
+
+### Loading
+
+Combiná `disabled` + un spinner + `aria-busy="true"`.
+
+<Canvas of={ButtonStories.Loading} />
+
+---
+
+## Como enlace
+
+Usá `render={<a href="..." />}` para preservar la semántica accesible del
+`<a>` con la apariencia de botón. **No** hagas `<Button><a/></Button>`.
+
+<Canvas of={ButtonStories.AsLink} />
+
+---
+
+## Grupos de botones
+
+Para agrupar visualmente varios botones (conectados, con separator, en
+columna, etc.) usá el componente dedicado **`ButtonGroup`**, no un
+`<div className="flex">` ad-hoc. Ver su sección en el sidebar
+`Design System / Forms / ButtonGroup`.
+
+```tsx
+import { Button, ButtonGroup, ButtonGroupSeparator } from "@/components/ui"
+
+;<ButtonGroup>
+  <Button variant="outline">Cancelar</Button>
+  <Button variant="outline">Guardar borrador</Button>
+  <Button variant="fill" color="primary">
+    Publicar
+  </Button>
+</ButtonGroup>
+```
+
+---
+
+## Personalización
+
+Override con `className` para casos puntuales. `buttonVariants` también
+está exportado para extender componentes no-`<Button>` (ej. un `<a>`
+estilizado).
+
+<Canvas of={ButtonStories.CustomColors} />
+
+---
+
+## Accesibilidad
+
+- **Teclado**: `Enter` y `Space` disparan el click (lo provee el primitive).
+- **Focus**: el estado `focus-visible` aplica `ring-2 ring-ring/30`. No lo desactives.
+- **Disabled**: `pointer-events: none` + opacidad 50%.
+- **Loading**: combiná `disabled` + spinner + `aria-busy="true"`.
+- **Ícono-only**: **siempre** pasá `aria-label` describiendo la acción.
+- **Como enlace**: usá `render={<a href="..." />}` para mantener la semántica accesible.
+
+---
+
+## Decisiones de diseño
+
+- **`rounded-none`** por defecto (sincronizado con Figma). Para esquinas redondeadas, agregá `className="rounded-full"`.
+- **Tipografía**: uppercase + `tracking-widest` para emular Label/Small de Figma.
+- **Sin icono por defecto** — agregar íconos solo cuando aportan información.
+
+---
+
+## API
+
+<ArgTypes of={ButtonStories} />
+
+---
+
+## Todas las historias
+
+<Stories />

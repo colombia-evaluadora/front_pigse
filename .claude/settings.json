@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node probe-parse.cjs)",
+      "Bash(node probe.cjs)",
+      "Bash(cp scripts/figma/code-tokens/theme.css /tmp/theme.original.css)",
+      "Bash(rm -rf scripts/figma/figma-tokens)",
+      "Bash(cp scripts/figma/code-tokens/theme.css /c/tmp/theme.roundtrip.css)",
+      "Bash(mkdir -p /c/tmp)",
+      "Bash(git show *)",
+      "Bash(node probe-diff.cjs)",
+      "Bash(grep -v \"deprecated\\\\|^$\\\\|Use .node\")",
+      "Bash(cp scripts/figma/code-tokens/theme.css scripts/figma/code-tokens/theme.original.css)",
+      "Bash(curl -sL -o badge_check.png \"https://www.figma.com/api/mcp/asset/489ccf3a-8e1e-44b1-b13a-010f0928af86\")",
+      "Bash(curl -sL -o badge_v6.png \"https://www.figma.com/api/mcp/asset/0a044537-f35f-400e-8b36-aa3168722614\")",
+      "Bash(curl -sL -o button_check.png \"https://www.figma.com/api/mcp/asset/26e3db53-1aeb-47e5-b0af-9e8fdea08b2e\")",
+      "Bash(curl -sL -o button_v2.png \"https://www.figma.com/api/mcp/asset/0d82b0d5-5dc4-4aba-ae21-b8888f9ab95e\")",
+      "Bash(curl -sL -o button_v3.png \"https://www.figma.com/api/mcp/asset/db705bb4-fd5d-4054-9f67-c2f2537bec61\")",
+      "Bash(curl -sL -o button_v4.png \"https://www.figma.com/api/mcp/asset/783846ef-7444-4e2b-8611-6d5aca921811\")",
+      "Bash(curl -sL -o badge_v8.png \"https://www.figma.com/api/mcp/asset/2b2c9999-251f-4f14-b5b0-356381eb42ab\")",
+      "Bash(curl -sL -o badge_v9.png \"https://www.figma.com/api/mcp/asset/1c2474a2-9681-431c-a5d5-cb83c4589308\")",
+      "Bash(curl -sL -o badge_red.png \"https://www.figma.com/api/mcp/asset/730beee3-9a1b-4de3-9854-4b6648929e48\")",
+      "Bash(curl -sL -o badge_v10.png \"https://www.figma.com/api/mcp/asset/6a6db2d1-225f-469b-97ca-a25ceb5f0f2c\")",
+      "Bash(curl -sL -o badge_reddark.png \"https://www.figma.com/api/mcp/asset/b6157f9e-605a-4daa-87d0-b81d907a0976\")",
+      "Bash(curl -sL -o badge_muted.png \"https://www.figma.com/api/mcp/asset/17b72194-8572-41cb-ac36-ef73287ab45c\")",
+      "Bash(curl -sL -o badge_final.png \"https://www.figma.com/api/mcp/asset/050f248d-5cf8-4ef1-b81e-61fe3b99ef76\")",
+      "Bash(curl -sL -o button_final.png \"https://www.figma.com/api/mcp/asset/d48432c9-55ee-4abc-a9d1-07d3c8f3e16d\")",
+      "mcp__plugin_figma_figma__get_variable_defs",
+      "mcp__plugin_figma_figma__get_design_context",
+      "mcp__plugin_figma_figma__search_design_system",
+      "mcp__plugin_figma_figma__list_file_components_for_code_connect",
+      "Bash(curl -L -o /tmp/badge.png \"https://www.figma.com/api/mcp/asset/a0ca4d01-602a-4427-b849-5b13b8d35564\")",
+      "Bash(curl -L -o /tmp/button.png \"https://www.figma.com/api/mcp/asset/8a77f97e-b78e-4791-a90a-28e6bbc772c9\")",
+      "WebFetch(domain:ui.shadcn.com)"
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "colombiaevaluadorav2",
+  "compatibility_date": "2026-07-23",
+  "main": "./worker/index.js",
+  "assets": {
+    "directory": "./dist",
+    // El Worker necesita el binding para poder servir los estáticos él mismo
+    // en el fallback de worker/index.js.
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Sin esto, `/api/*` lo atiende el servidor de assets: los POST dan 405 y
+    // los GET devuelven index.html por el `not_found_handling` de arriba. Con
+    // la regla, esas rutas entran al Worker, que las reenvía al gateway; todo
+    // lo demás sigue yendo directo a los estáticos.
+    "run_worker_first": ["/api/*"],
+  },
+  "vars": {
+    // Mismo servidor que `VITE_APP_API_PROXY_TARGET` usa en dev, pero POR
+    // NOMBRE y no por IP: un `fetch` de un Worker a una IP pelada lo rechaza
+    // Cloudflare con "error code: 1003" (Direct IP Access Not Allowed), así que
+    // `http://172.233.184.248:8080` devolvía 403 en todas las llamadas.
+    //
+    // Este hostname es el rDNS que Linode le da a la máquina. Funciona hoy, pero
+    // queda atado a la IP: si el servidor se muda, cambia. Lo correcto a futuro
+    // es un subdominio propio (api-test.colombiaevaluadora.com) apuntando acá.
+    //
+    // Va en el Worker y no en el bundle porque se resuelve del lado del
+    // servidor: el navegador nunca ve esta URL (es HTTP plano y el sitio es
+    // HTTPS, así que desde el navegador sería mixed content).
+    "API_PROXY_TARGET": "http://172-233-184-248.ip.linodeusercontent.com:8080",
+  },
+}

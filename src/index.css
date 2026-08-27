@@ -1,0 +1,617 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Font variables */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/noto-sans";
+
+:root {
+  --font-sans: "Inter Variable", sans-serif;
+  --font-heading: "Inter Variable", sans-serif;
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
+}
+
+/* Radius variables */
+:root {
+  --radius: 0.875rem;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--accordion-panel-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--accordion-panel-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@theme inline {
+  --radius-xs: calc(var(--radius) * 0.4);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --animate-accordion-down: var(--animate-accordion-down);
+  --animate-accordion-up: var(--animate-accordion-up);
+}
+
+/* Colors */
+:root {
+  /* ---------- SUPERFICIES ------------------------ */
+  --background: #ffffff;
+  --foreground: #2c3f5b;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+
+  /* ---------- MARCA ------------------------------------------ */
+  --primary: #0d99ff;
+  --primary-foreground: #f7fbfd;
+  --secondary: #618200;
+  --secondary-foreground: #f9fbf5;
+  --accent: #99b928;
+  --accent-foreground: #192400;
+  --muted: #d6dbe5;
+  --muted-foreground: #666e7a;
+
+  /* ---------- COLORES ------------------------------ */
+  --red: #a30d11;
+  --red-foreground: #ffffff;
+  --green: #1f9254;
+  --green-foreground: #ffffff;
+  --yellow: #eabe4a;
+  --yellow-foreground: #1e1400;
+  --blue: #0079b5;
+  --blue-foreground: #f7fbfd;
+  --purple: #7a3ec8;
+  --purple-foreground: #faf7fe;
+  --orange: #cd6200;
+  --orange-foreground: #ffffff;
+  --navy: #0b3879;
+  --navy-foreground: #f5f8fd;
+
+  /* ---------- BORDES / FOCO ---------------------------------- */
+  --border: #e3e7ea;
+  --input: #e3e7ea;
+  --ring: #1788c8;
+
+  /* ---------- CHARTS ----------------------------------------- */
+  --chart-1: #1788c8;
+  --chart-2: #7b9e2b;
+  --chart-3: #00598f;
+  --chart-4: #a9c558;
+  --chart-5: #74c2ee;
+
+  /* ---------- SIDEBAR -------------------- */
+  --sidebar: #f8fafc;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* ---------- STROKES (alpha 30%) --------------------------- */
+  --foreground-stroke: #090d104d;
+  --primary-stroke: #0d99ff4d;
+  --secondary-stroke: #6182004d;
+  --muted-stroke: #d6dbe54d;
+  --blue-stroke: #0079b54d;
+  --red-stroke: #a30d114d;
+  --yellow-stroke: #eabe4a4d;
+  --green-stroke: #1f92544d;
+  --purple-stroke: #7a3ec84d;
+  --orange-stroke: #cd62004d;
+  --navy-stroke: #0b38794d;
+
+  /* ---------- SOFT FILLS (alpha 8%, excepto muted, yellow y orange en 28%) ------ */
+  --foreground-22: #090d1014;
+  --primary-22: #0d99ff14;
+  --secondary-22: #61820014;
+  --muted-22: #d6dbe547;
+  --blue-22: #0079b514;
+  --red-22: #a30d1114;
+  --yellow-22: #eabe4a47;
+  --green-22: #1f925414;
+  --purple-22: #7a3ec814;
+  --orange-22: #cd620014;
+  --navy-22: #0b387914;
+}
+
+.dark {
+  /* ---------- SUPERFICIES ------------------------ */
+  --background: #080d11;
+  --foreground: #f2f6f8;
+  --card: #11181e;
+  --card-foreground: var(--foreground);
+  --popover: #11181e;
+  --popover-foreground: var(--foreground);
+
+  /* ---------- MARCA ------------------------------------------ */
+  --primary: #40a1e1;
+  --primary-foreground: #000d18;
+  --secondary: #84a73c;
+  --secondary-foreground: #091000;
+  --accent: #a8c64e;
+  --accent-foreground: #111a00;
+  --muted: #424752;
+  --muted-foreground: #99a3b2;
+
+  /* ---------- COLORES ------------------------------ */
+  --red: #ff6568;
+  --red-foreground: #1e0304;
+  --green: #84a73c;
+  --green-foreground: #091000;
+  --yellow: #f69e00;
+  --yellow-foreground: #221200;
+  --blue: #40a1e1;
+  --blue-foreground: #000d18;
+  --purple: #a98bf0;
+  --purple-foreground: #150a2b;
+  --orange: #ff8a4c;
+  --orange-foreground: #2a1103;
+  /* Navy no se aclara en oscuro como el resto de colores: es una superficie de
+     marca (el bloque de la pantalla de login), y aclararla la vuelve un parche
+     lavanda sobre el fondo oscuro. Se queda igual en los cuatro temas. */
+  --navy: #0b3879;
+  --navy-foreground: #f5f8fd;
+
+  /* ---------- BORDES / FOCO ---------------------------------- */
+  --border: #ffffff1a;
+  --input: #ffffff26;
+  --ring: #40a1e1;
+
+  /* ---------- CHARTS ----------------------------------------- */
+  --chart-1: #47a7e7;
+  --chart-2: #95bb46;
+  --chart-3: #1777b8;
+  --chart-4: #bedd66;
+  --chart-5: #8fd5fd;
+
+  /* ---------- SIDEBAR -------------------- */
+  --sidebar: #0e1319;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: #ffffff1a;
+  --sidebar-ring: var(--ring);
+
+  /* ---------- STROKES (alpha 30%) --------------------------- */
+  --foreground-stroke: #f2f6f84d;
+  --primary-stroke: #40a1e14d;
+  --secondary-stroke: #84a73c4d;
+  --muted-stroke: #4247524d;
+  --blue-stroke: #40a1e14d;
+  --red-stroke: #ff65684d;
+  --yellow-stroke: #f69e004d;
+  --green-stroke: #84a73c4d;
+  --purple-stroke: #a98bf04d;
+  --orange-stroke: #ff8a4c4d;
+  --navy-stroke: #0b38794d;
+
+  /* ---------- SOFT FILLS (alpha 8%, excepto muted, yellow y orange en 28%) ------ */
+  --foreground-22: #f2f6f814;
+  --primary-22: #40a1e114;
+  --secondary-22: #84a73c14;
+  --muted-22: #42475247;
+  --blue-22: #40a1e114;
+  --red-22: #ff656814;
+  --yellow-22: #f69e0047;
+  --green-22: #84a73c14;
+  --purple-22: #a98bf014;
+  --orange-22: #ff8a4c14;
+  --navy-22: #0b387914;
+}
+
+[data-theme="red"] {
+  /* ---------- SUPERFICIES ------------------------ */
+  --background: #ffffff;
+  --foreground: #2c3f5b;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+
+  /* ---------- MARCA ------------------------------------------ */
+  --primary: #d20b11;
+  --primary-foreground: #fff8f7;
+  --secondary: #333330;
+  --secondary-foreground: #fafaf9;
+  --accent: #f19f93;
+  --accent-foreground: #4c110d;
+  --muted: #dbd1d1;
+  --muted-foreground: #756161;
+
+  /* ---------- COLORES ------------------------------ */
+  --red: #a30d11;
+  --red-foreground: #ffffff;
+  --green: #1f9254;
+  --green-foreground: #ffffff;
+  --yellow: #eabe4a;
+  --yellow-foreground: #1e1400;
+  --blue: #0079b5;
+  --blue-foreground: #f7fbfd;
+  --purple: #7a3ec8;
+  --purple-foreground: #faf7fe;
+  --orange: #cd6200;
+  --orange-foreground: #ffffff;
+  --navy: #650b14;
+  --navy-foreground: #fdf5f6;
+
+  /* ---------- BORDES / FOCO ---------------------------------- */
+  --border: #e3e7ea;
+  --input: #e3e7ea;
+  --ring: #d20b11;
+
+  /* ---------- CHARTS ----------------------------------------- */
+  --chart-1: #d20b11;
+  --chart-2: #3b3b38;
+  --chart-3: #940307;
+  --chart-4: #f08f83;
+  --chart-5: #999992;
+
+  /* ---------- SIDEBAR -------------------- */
+  --sidebar: #fcf8f8;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* ---------- STROKES (alpha 30%) --------------------------- */
+  --foreground-stroke: #090d104d;
+  --primary-stroke: #d20b114d;
+  --secondary-stroke: #3333304d;
+  --muted-stroke: #dbd1d14d;
+  --blue-stroke: #0079b54d;
+  --red-stroke: #a30d114d;
+  --yellow-stroke: #eabe4a4d;
+  --green-stroke: #1f92544d;
+  --purple-stroke: #7a3ec84d;
+  --orange-stroke: #cd62004d;
+  --navy-stroke: #650b144d;
+
+  /* ---------- SOFT FILLS (alpha 8%, excepto muted, yellow y orange en 28%) ------ */
+  --foreground-22: #090d1014;
+  --primary-22: #d20b1114;
+  --secondary-22: #33333014;
+  --muted-22: #dbd1d147;
+  --blue-22: #0079b514;
+  --red-22: #a30d1114;
+  --yellow-22: #eabe4a47;
+  --green-22: #1f925414;
+  --purple-22: #7a3ec814;
+  --orange-22: #cd620014;
+  --navy-22: #650b1414;
+}
+
+.dark[data-theme="red"] {
+  /* ---------- SUPERFICIES ------------------------ */
+  --background: #080d11;
+  --foreground: #f2f6f8;
+  --card: #1e1214;
+  --card-foreground: var(--foreground);
+  --popover: #11181e;
+  --popover-foreground: var(--foreground);
+
+  /* ---------- MARCA ------------------------------------------ */
+  --primary: #f4514f;
+  --primary-foreground: #1c0202;
+  --secondary: #aeaeab;
+  --secondary-foreground: #121210;
+  --accent: #eb8376;
+  --accent-foreground: #1e0403;
+  --muted: #473d3d;
+  --muted-foreground: #a89494;
+
+  /* ---------- COLORES ------------------------------ */
+  --red: #ff6568;
+  --red-foreground: #1e0304;
+  --green: #84a73c;
+  --green-foreground: #091000;
+  --yellow: #f69e00;
+  --yellow-foreground: #221200;
+  --blue: #40a1e1;
+  --blue-foreground: #000d18;
+  --purple: #a98bf0;
+  --purple-foreground: #150a2b;
+  --orange: #ff8a4c;
+  --orange-foreground: #2a1103;
+  /* Navy no se aclara en oscuro como el resto de colores: es una superficie de
+     marca (el bloque de la pantalla de login), y aclararla la vuelve un parche
+     sobre el fondo oscuro. Sí cambia de familia con el acento: acá es el vino
+     del tema rojo, igual que en su variante clara. */
+  --navy: #650b14;
+  --navy-foreground: #fdf5f6;
+
+  /* ---------- BORDES / FOCO ---------------------------------- */
+  --border: #ffffff1a;
+  --input: #ffffff26;
+  --ring: #f4514f;
+
+  /* ---------- CHARTS ----------------------------------------- */
+  --chart-1: #f75d59;
+  --chart-2: #a5a5a1;
+  --chart-3: #c9302d;
+  --chart-4: #feaba0;
+  --chart-5: #64645e;
+
+  /* ---------- SIDEBAR -------------------- */
+  --sidebar: #190e0e;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: #ffffff1a;
+  --sidebar-ring: var(--ring);
+
+  /* ---------- STROKES (alpha 30%) --------------------------- */
+  --foreground-stroke: #f2f6f84d;
+  --primary-stroke: #f4514f4d;
+  --secondary-stroke: #aeaeab4d;
+  --muted-stroke: #473d3d4d;
+  --blue-stroke: #40a1e14d;
+  --red-stroke: #ff65684d;
+  --yellow-stroke: #f69e004d;
+  --green-stroke: #84a73c4d;
+  --purple-stroke: #a98bf04d;
+  --orange-stroke: #ff8a4c4d;
+  --navy-stroke: #650b144d;
+
+  /* ---------- SOFT FILLS (alpha 8%, excepto muted, yellow y orange en 28%) ------ */
+  --foreground-22: #f2f6f814;
+  --primary-22: #f4514f14;
+  --secondary-22: #aeaeab14;
+  --muted-22: #473d3d47;
+  --blue-22: #40a1e114;
+  --red-22: #ff656814;
+  --yellow-22: #f69e0047;
+  --green-22: #84a73c14;
+  --purple-22: #a98bf014;
+  --orange-22: #ff8a4c14;
+  --navy-22: #650b1414;
+}
+
+@theme inline {
+  /* ---------- SUPERFICIES ------------------------ */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* ---------- MARCA ------------------------------------------ */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  /* ---------- COLORES ------------------------------ */
+  --color-red: var(--red);
+  --color-red-foreground: var(--red-foreground);
+  --color-green: var(--green);
+  --color-green-foreground: var(--green-foreground);
+  --color-yellow: var(--yellow);
+  --color-yellow-foreground: var(--yellow-foreground);
+  --color-blue: var(--blue);
+  --color-blue-foreground: var(--blue-foreground);
+  --color-purple: var(--purple);
+  --color-purple-foreground: var(--purple-foreground);
+  --color-orange: var(--orange);
+  --color-orange-foreground: var(--orange-foreground);
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
+
+  /* ---------- BORDES / FOCO ---------------------------------- */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ---------- CHARTS ----------------------------------------- */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* ---------- SIDEBAR -------------------- */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ---------- STROKES (alpha 30%) --------------------------- */
+  --color-foreground-stroke: var(--foreground-stroke);
+  --color-primary-stroke: var(--primary-stroke);
+  --color-secondary-stroke: var(--secondary-stroke);
+  --color-muted-stroke: var(--muted-stroke);
+  --color-blue-stroke: var(--blue-stroke);
+  --color-red-stroke: var(--red-stroke);
+  --color-yellow-stroke: var(--yellow-stroke);
+  --color-green-stroke: var(--green-stroke);
+  --color-purple-stroke: var(--purple-stroke);
+  --color-orange-stroke: var(--orange-stroke);
+  --color-navy-stroke: var(--navy-stroke);
+
+  /* ---------- SOFT FILLS (alpha 8%, excepto muted, yellow y orange en 28%) ------ */
+  --color-foreground-22: var(--foreground-22);
+  --color-primary-22: var(--primary-22);
+  --color-secondary-22: var(--secondary-22);
+  --color-muted-22: var(--muted-22);
+  --color-blue-22: var(--blue-22);
+  --color-red-22: var(--red-22);
+  --color-yellow-22: var(--yellow-22);
+  --color-green-22: var(--green-22);
+  --color-purple-22: var(--purple-22);
+  --color-orange-22: var(--orange-22);
+  --color-navy-22: var(--navy-22);
+}
+
+/* Barra de scroll minimalista.
+
+   La nativa de Windows es una franja gris de ~16px con flechas en los extremos;
+   dentro de una caja redondeada se ve como un bloque pegado que no pertenece al
+   diseño. Esta es de 6px, sin flechas y sin pista: lo único que se ve es el
+   pulgar `muted`, flotando sobre el fondo de la caja.
+
+   `scrollbar-width`/`scrollbar-color` es el estándar (Firefox, Chrome nuevos);
+   las reglas `::-webkit-scrollbar` cubren el resto de navegadores WebKit.
+
+   Es opt-in a propósito: hoy solo la usa el contenedor de `Table`. El resto de
+   las barras del sitio siguen siendo las nativas. */
+@utility scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--muted);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+  &::-webkit-scrollbar-button,
+  &::-webkit-scrollbar-corner {
+    display: none;
+  }
+}
+
+/* Base styles */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  /* Edge dibuja su propio ojito de "revelar contraseña" (y una X para
+     limpiar) dentro del input. Los formularios usan su propio toggle, así
+     que quedarían dos controles encimados. */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
+
+  /* Typography — titles in Noto, body in Inter */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+  h1 {
+    @apply text-4xl leading-tight font-bold;
+  }
+  h2 {
+    @apply text-3xl leading-tight font-bold;
+  }
+  h3 {
+    @apply text-2xl leading-tight font-semibold;
+  }
+  h4 {
+    @apply text-xl leading-snug font-semibold;
+  }
+  h5 {
+    @apply text-lg leading-snug font-semibold;
+  }
+  h6 {
+    @apply text-base leading-snug font-semibold;
+  }
+  p {
+    @apply text-sm leading-normal;
+  }
+  small {
+    @apply text-xs leading-snug;
+  }
+}
+
+/* Autofill de Chrome/Safari.
+
+   El navegador pinta un fondo amarillo (azul si el sistema está en dark) sobre
+   los campos autocompletados, en una capa que `background: transparent` no
+   puede tocar. `background-clip: text` sí: recorta ese fondo a la silueta del
+   texto, con lo que deja de verse y el campo queda realmente transparente
+   —importa porque el input vive dentro de un `InputGroup` que es quien pinta el
+   fondo—. `-webkit-text-fill-color` devuelve el color de texto del tema, que el
+   recorte se llevaría por delante. La transición larguísima retrasa
+   indefinidamente el pintado del fondo y mata el flash amarillo del primer
+   frame.
+
+   Va FUERA de `@layer base` a propósito: el CSS sin capa gana a cualquier capa,
+   y dentro de `base` las utilidades de Tailwind lo pisarían. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  transition: background-color 5000s ease-in-out 0s;
+}

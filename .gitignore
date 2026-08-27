@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Variables de entorno: NO se versionan.
+# Traen el target del proxy al gateway y flags por ambiente, que cambian
+# entre local, test y produccion. Cada entorno arma el suyo.
+.env
+.env.*
+!.env.example
+
+node_modules
+dist
+dist-ssr
+storybook-static
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Assets de pdf.js copiados desde node_modules por el plugin de vite.config.ts
+public/pdfjs/

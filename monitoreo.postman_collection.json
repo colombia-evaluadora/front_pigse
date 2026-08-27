@@ -1,0 +1,298 @@
+{
+  "info": {
+    "_postman_id": "monitoreo-compliance-collection",
+    "name": "Monitoreo y cumplimiento",
+    "description": "Colección de endpoints de los módulos **Monitoreo y cumplimiento institucional** y **Gestión documental** del front PIGSE. Incluye el flujo de autenticación (login + refresh + logout) y los endpoints de:\n\n- **Monitoreo**: métricas globales de cumplimiento documental y detalle por establecimiento educativo.\n- **Documentos**: vigentes por EE, carga (multipart) y eliminación de la versión vigente.\n\n### Variables de entorno (a nivel de colección)\n- `baseUrl`: URL base del API. Para mock MSW local: `http://localhost:5173`. Para backend real: `https://<host-sso>`.\n- `accessToken`: token Bearer devuelto por `/api/auth/login`. Se setea automáticamente desde el test del request de login.\n- `documentType`: tipo de documento (`PEI` | `PEC` | `PMI`) usado por los endpoints `/documents/:type/...`.\n\n### Cómo usar\n1. Ejecutar el request **Auth → Login** para obtener el `token`.\n2. El test del login guarda automáticamente el token en la variable de colección `accessToken`.\n3. Los requests de las carpetas **Monitoreo** y **Documentos** lo consumen vía header `Authorization: Bearer {{accessToken}}` (definido a nivel de carpeta, no hay que repetirlo).\n\n### Rutas\n| Mock (MSW local) | Backend real (`VITE_APP_ENABLE_API_MOCKING=inactive`) |\n| --- | --- |\n| `GET /api/compliance/metrics` | `GET /eval-col/cumplimiento/metricas` |\n| `GET /api/compliance/rows` | `GET /eval-col/cumplimiento/listar` |\n| `GET /api/documents` | `GET /eval-col/documentos` |\n| `POST /api/documents/upload` | `POST /eval-col/documentos/upload` |\n| `DELETE /api/documents/:type` | `DELETE /eval-col/documentos/:type` |\n\nEl front resuelve cuál usar según `VITE_APP_ENABLE_API_MOCKING` (ver `src/lib/api-routes.ts` → `apiPath`). El prefijo `/eval-col` lo agrega el gateway del SSO antes de rutear al motor de queries; en Postman hay que ponerlo a mano cuando se pegue contra el backend real.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5173",
+      "type": "default",
+      "description": "URL base del API. Mock local: http://localhost:5173 (vite sirve MSW sobre /api). Backend real: https://<host-sso>."
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "default",
+      "description": "Bearer token. Se setea automáticamente desde el test del request Login."
+    },
+    {
+      "key": "refreshCookie",
+      "value": "",
+      "type": "default",
+      "description": "Valor de la cookie sso_refresh. El backend real la emite como HttpOnly; en Postman hay que copiarla a mano desde la respuesta del login."
+    },
+    {
+      "key": "documentType",
+      "value": "PEI",
+      "type": "default",
+      "description": "Tipo de documento para los endpoints /documents/:type/... Valores posibles: PEI | PEC | PMI."
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Flujo de autenticación previo a consumir el tablero. El login devuelve un `token` (Bearer) y setea la cookie `sso_refresh` (larga vida). El refresh la consume para emitir un token nuevo sin pedir credenciales otra vez.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('accessToken', json.token);",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    console.log('[Auth] Token guardado en collection variable.');",
+                  "}",
+                  "// El refresh cookie viene en Set-Cookie del response. MSW y el backend",
+                  "// real la escriben como HttpOnly + SameSite=Strict; Postman la persiste",
+                  "// automáticamente en el cookie jar del dominio.",
+                  "const setCookie = pm.response.headers.get('Set-Cookie');",
+                  "if (setCookie && setCookie.includes('sso_refresh=')) {",
+                  "    const match = setCookie.match(/sso_refresh=([^;]+)/);",
+                  "    if (match) {",
+                  "        pm.collectionVariables.set('refreshCookie', match[1]);",
+                  "        console.log('[Auth] Refresh cookie guardada.');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-remember-me",
+                "value": "true",
+                "description": "Si vale \"true\", el refresh cookie dura 30 días. Si se omite o vale \"false\", dura 1h."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Autentica al usuario contra `auth-center` (mock o real) y devuelve:\n\n```json\n{\n  \"token\": \"<jwt>\",\n  \"refreshToken\": \"<opaco>\",\n  \"expiresIn\": 3600\n}\n```\n\nEl `refreshToken` también viaja como cookie `sso_refresh` (HttpOnly en el backend real). El `token` (Bearer) vence en `expiresIn` segundos y hay que renovarlo con **Refresh** antes de que expire."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('accessToken', json.token);",
+                  "    console.log('[Auth] Token refrescado.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            },
+            "description": "Renueva el `token` (Bearer) usando la cookie `sso_refresh`. NO requiere `Authorization` header: la credencial es la cookie misma, igual que `RefreshController` en el backend real (es `permitAll()` justamente porque \"the cookie itself is the auth\").\n\nEl front llama a este endpoint al montar la app, antes de pegar contra cualquier recurso protegido, para restaurar la sesión sin pasar por el form de login.\n\nSi la cookie no existe o venció, devuelve `401` con `{ error: \"no_refresh_cookie\" }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Cierra la sesión del lado del servidor: mata la cookie `sso_refresh`. Después de esto el **Refresh** devuelve `401`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Monitoreo",
+      "description": "Endpoints del tablero \"Monitoreo y cumplimiento institucional\". Los dos viven detrás del query-service (`/eval-col/cumplimiento/...`); en mock local MSW los expone bajo `/api/compliance/...`.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Métricas globales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/compliance/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "compliance", "metrics"]
+            },
+            "description": "KPIs del tablero: total de EE y avance por documento (PEI / PEC / PMI). Alimenta la fila de 4 tarjetas KPI arriba de la tabla.\n\n### Respuesta\n```json\n{\n  \"totalEstablishments\": 50,\n  \"pei\":  { \"completed\": 10, \"total\": 50, \"percent\": 20 },\n  \"pec\":  { \"completed\":  6, \"total\": 50, \"percent\": 12 },\n  \"pmi\":  { \"completed\": 10, \"total\": 50, \"percent\": 20 }\n}\n```\n\n### Backend real\n`GET {{baseUrl}}/eval-col/cumplimiento/metricas` — el front usa `apiPath(\"/compliance/metrics\", \"/cumplimiento/metricas\")` (ver `src/lib/api-routes.ts` y `src/features/monitoring/api/query/use-compliance.ts`). El prefijo `/eval-col` lo agrega el gateway del SSO antes de rutear al motor de queries; en el `path_template` de la tabla `query` NO aparece."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle por establecimiento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/compliance/rows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "compliance", "rows"]
+            },
+            "description": "Lista plana de EE con el estado documental por PEI/PEC/PMI y el progreso global del EE. Alimenta la tabla \"Detalle por establecimiento\".\n\n### Respuesta (envelope del query-service)\n```json\n{\n  \"rows\": [\n    {\n      \"id\": 1,\n      \"establishmentName\": \"Institución Educativa Denzil Escolar\",\n      \"pei\": { \"status\": \"COMPLETO\", \"fileName\": \"Denzil_Escolar_PEI_2026.pdf\" },\n      \"pec\": { \"status\": \"PENDIENTE\", \"fileName\": null },\n      \"pmi\": { \"status\": \"COMPLETO\", \"fileName\": \"Denzil_Escolar_PMI_2026.pdf\" },\n      \"globalProgress\": 67\n    }\n  ],\n  \"pageCount\": 1,\n  \"totalCount\": 10\n}\n```\n\n### Detalle por documento\n- `status`: `COMPLETO` (archivo vigente cargado) | `PENDIENTE` (todavía no entregado).\n- `fileName`: nombre del archivo vigente. `null` cuando está `PENDIENTE`.\n\n### Estado por celda en la UI\n- `COMPLETO` → dot verde + `HoverCard` con nombre del archivo y botón \"Consultar Documento\" que navega al **Visor de PDF** (`/app/visor/:type`).\n- `PENDIENTE` → dot rojo + etiqueta \"N/A\".\n\n### Backend real\n`GET {{baseUrl}}/eval-col/cumplimiento/listar` — mismo criterio que métricas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documentos",
+      "description": "Endpoints del módulo \"Gestión documental\" (vista institucional). Maneja los documentos vigentes por EE (PEI / PEC / PMI) y la carga/eliminación de la versión vigente.\n\nTodos los requests de esta carpeta consumen `Bearer {{accessToken}}` heredado del folder.\n\n### Tipos aceptados\n`PEI` | `PEC` | `PMI` — el discriminador es el id de tipo, no un autonumérico, porque hay a lo sumo una versión vigente por tipo. El valor se setea vía la variable de colección `documentType`.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Listar documentos vigentes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents"]
+            },
+            "description": "Lista los documentos institucionales vigentes del EE con su estado de entrega. No es paginado: el catálogo es cerrado y chico (PEI / PEC / PMI). Alimenta la pantalla \"Gestión documental\".\n\n### Respuesta\n```json\n{\n  \"rows\": [\n    {\n      \"id\": \"PEI\",\n      \"type\": \"PEI\",\n      \"typeName\": \"Proyecto Educativo Institucional (PEI)\",\n      \"status\": \"COMPLETO\",\n      \"fileName\": \"IE_DENZIL_EDUCATIVA_PEI_2026.pdf\",\n      \"uploadedAt\": \"2026-01-15T10:30:00Z\",\n      \"sizeBytes\": 2456789\n    }\n  ]\n}\n```\n\n### Estado del documento\n- `COMPLETO` → archivo vigente cargado (badge verde + ícono PDF).\n- `PENDIENTE` → no hay archivo vigente todavía (badge rojo). En este caso `fileName`, `uploadedAt` y `sizeBytes` son `null`.\n\n### Backend real\n`GET {{baseUrl}}/eval-col/documentos` (ver `src/features/document-management/api/query/use-documents.ts`).",
+            "response": []
+          }
+        },
+        {
+          "name": "Subir documento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "description": "Lo setea Postman automáticamente al elegir body 'form-data'."
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "tipo",
+                  "value": "{{documentType}}",
+                  "type": "text",
+                  "description": "Tipo de documento: PEI | PEC | PMI. Default: variable de colección documentType."
+                },
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "description": "Archivo PDF / Word / Excel con el documento. Tope: 25 MB. Lo que `file-service` espera bajo el nombre `archivo` (ver `src/lib/files.ts` → `postMultipart`).",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", "upload"]
+            },
+            "description": "Carga (o reemplaza) la versión vigente de un documento.\n\n### Form fields\n- `tipo` (text, requerido) — `PEI` | `PEC` | `PMI`. Default: variable `{{documentType}}`.\n- `archivo` (file, requerido) — PDF / Word / Excel. Tope 25 MB. `file-service` lo procesa antes de reenviar al query-service; en el mock solo nos interesa el nombre y el peso.\n\n### Respuesta\n```json\n{\n  \"status\": \"ok\",\n  \"message\": \"Documento cargado correctamente.\",\n  \"document\": {\n    \"id\": \"PEI\",\n    \"type\": \"PEI\",\n    \"typeName\": \"Proyecto Educativo Institucional (PEI)\",\n    \"status\": \"COMPLETO\",\n    \"fileName\": \"<nombre del archivo subido>\",\n    \"uploadedAt\": \"<ISO 8601>\",\n    \"sizeBytes\": <bytes>\n  }\n}\n```\n\n### Errores\n- `400` si falta `tipo`, falta `archivo`, el archivo está vacío o el tipo no es válido.\n\n### Backend real\n`POST {{baseUrl}}/eval-col/documentos/upload` (ver `src/features/document-management/api/mutations/upload-document.ts`).",
+            "response": []
+          }
+        },
+        {
+          "name": "Eliminar documento vigente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/:type",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", ":type"],
+              "variable": [
+                {
+                  "key": "type",
+                  "value": "{{documentType}}",
+                  "description": "Tipo de documento: PEI | PEC | PMI. Default: variable de colección documentType."
+                }
+              ]
+            },
+            "description": "Elimina la versión vigente del documento: el archivo desaparece y el estado del documento vuelve a `PENDIENTE` hasta que se suba uno nuevo.\n\n### Path param\n- `type` — `PEI` | `PEC` | `PMI`. Default: variable `{{documentType}}`.\n\n### Respuesta\n```json\n{\n  \"status\": \"ok\",\n  \"message\": \"Documento eliminado.\",\n  \"document\": {\n    \"id\": \"PEI\",\n    \"type\": \"PEI\",\n    \"typeName\": \"Proyecto Educativo Institucional (PEI)\",\n    \"status\": \"PENDIENTE\",\n    \"fileName\": null,\n    \"uploadedAt\": null,\n    \"sizeBytes\": null\n  }\n}\n```\n\n### Errores\n- `400` si `type` no es válido.\n- `404` si no hay versión vigente para eliminar.\n- `500` si falla la operación.\n\n### Backend real\n`DELETE {{baseUrl}}/eval-col/documentos/:type` (ver `src/features/document-management/api/mutations/delete-document.ts`).",
+            "response": []
+          }
+        }
+      ]
+    }
+  ]
+}
