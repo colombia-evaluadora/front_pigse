@@ -1,0 +1,52 @@
+# =============================================================================
+# deploy-test.yml — despliega `test` al Worker de pruebas (backend real).
+#
+# Flujo de ramas:
+#
+#   feature/CU-xxxx → dev → test → main
+#                      │      │      │
+#                      │      │      └── tag v* → release.yml → pigse.com
+#                      │      └── ESTE workflow → test.pigse.com (backend real)
+#                      └── deploy-dev.yml → dev.pigse.com (MSW, sin backend)
+#
+#   `dev`  integración. Despliega a dev.pigse.com con mocks.
+#   `test` marca de promoción: "esto pasó QA con el backend real". Es el
+#          entorno que mira el cliente.
+#   `main` releases, con tag por versión.
+#
+# ---- Por qué `push` acá y `workflow_run` en dev ------------------------
+#
+# CI corre SOLO en `dev` (ver su bloque `on:`), a propósito: `test` recibe
+# merges YA verificados ahí, y re-verificarlos duplica minutos sin añadir
+# señal. Como no hay run de CI sobre `test` al que engancharse, el trigger
+# es el push directo.
+#
+# La contrapartida asumida: si alguien pushea a `test` algo que no pasó por
+# `dev`, se despliega sin checks. El control es de proceso (la promoción va
+# por PR desde `dev`, ver `scripts/promote-test-to-main.sh`), no técnico —
+# con plan free y repo privado no hay branch protection que lo imponga.
+# =============================================================================
+
+name: Deploy test
+
+on:
+  push:
+    branches: [test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un deploy a la vez; el siguiente espera en cola. `cancel-in-progress: false`
+# porque cortar un `wrangler deploy` a mitad es peor que esperar.
+concurrency:
+  group: deploy-test
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: test
+      ref: ${{ github.sha }}
+    secrets: inherit

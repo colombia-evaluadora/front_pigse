@@ -1,0 +1,71 @@
+# =============================================================================
+# deploy-dev.yml — despliega `dev` al Worker de desarrollo (con mocks).
+#
+# Flujo de ramas:
+#
+#   feature/CU-xxxx → dev → test → main
+#                      │      │      │
+#                      │      │      └── tag v* → release.yml → pigse.com
+#                      │      └── deploy-test.yml → test.pigse.com (backend real)
+#                      └── ESTE workflow → dev.pigse.com (MSW, sin backend)
+#
+# ---- Qué tiene de distinto este entorno --------------------------------
+#
+# `dev.pigse.com` corre con `VITE_APP_ENABLE_API_MOCKING=active`, así que MSW
+# intercepta `/api/*` dentro del navegador y la app funciona entera sin
+# backend. Sirve para revisar UI sin depender de que el Linode de test esté
+# arriba, y para que diseño/QA vean una feature antes de que exista el
+# endpoint.
+#
+# El flag es de BUILD (Vite lo hornea en el bundle), así que no se configura
+# en wrangler.jsonc: viene del secreto ENV_FILE del environment `dev`.
+#
+# ---- Por qué `workflow_run` y no `push` --------------------------------
+#
+# El gate es CI: nunca se despliega un commit cuyos checks fallaron. Un
+# `push: [dev]` correría en paralelo al CI sin esperar su resultado.
+#
+# La condición NO filtra por `head_branch == 'dev'`: en un `workflow_run`,
+# `github.event.workflow_run.head_branch` apunta a la rama donde vive ESTE
+# fichero (la default, `main`), no a la del push que disparó CI. El filtro
+# real es indirecto: CI solo corre en `dev` (ver su bloque `on:`), así que un
+# `workflow_run` con `event == 'push'` sólo puede venir de `dev`.
+# =============================================================================
+
+name: Deploy dev
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Solo dos de los tres triggers posibles despliegan:
+    #   1. workflow_dispatch — redespliegue manual.
+    #   2. workflow_run      — CI verde Y disparado por un push (no por un
+    #                          pull_request: un PR contra `dev` todavía no
+    #                          está integrado, desplegarlo pisaría el entorno
+    #                          con código sin mergear).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: dev
+      # El SHA exacto que pasó CI, no el HEAD de la rama: entre que CI
+      # terminó y este workflow arranca puede haber entrado otro push, y
+      # desplegar ese otro commit sería publicar algo que ningún check
+      # verificó. En `workflow_dispatch` no hay run previo del que sacarlo,
+      # así que ahí va el HEAD de la rama elegida.
+      ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+    secrets: inherit

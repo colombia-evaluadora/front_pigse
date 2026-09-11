@@ -1,0 +1,92 @@
+# =============================================================================
+# release.yml — un tag `v*` despliega a producción.
+#
+#   feature/CU-xxxx → dev → test → main ──tag v1.2.3──> Worker de producción
+#                      │
+#                      └── deploy-test.yml → Worker de test
+#
+# ---- Por qué el tag y no `main` --------------------------------------------
+#
+# El environment `production` tiene política de rama "solo tags v*", así que
+# un push a `main` no puede desplegar aunque alguien añada el trigger. Y exige
+# revisor: el job se queda esperando aprobación antes de publicar.
+#
+# ---- Por qué reconstruye en vez de reusar el artefacto de test -------------
+#
+# Un release tiene que ser reproducible: se construye desde el commit del tag,
+# con el ENV_FILE de `production` (que apunta a otro backend que el de test).
+# Reusar el bundle de test sería publicar un binario con las URLs de test
+# dentro — el `.env` de Vite se hornea en el JavaScript, no se inyecta después.
+#
+# ---- Rollback ---------------------------------------------------------------
+#
+#   wrangler deployments list --name <worker>
+#   wrangler rollback <version-id> --name <worker>
+#
+# O relanzar este workflow con `workflow_dispatch` sobre el tag anterior.
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Para re-desplegar un tag ya publicado sin volver a etiquetar (rollback, o
+  # un deploy que falló por causas ajenas al build).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag ya existente a re-desplegar (p.ej. v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Dos releases a la vez dejarían el Worker con la versión de quien gane la
+# carrera. `cancel-in-progress: false` porque cortar un deploy a mitad es peor
+# que esperar a que acabe.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ───────── Qué versión se está publicando ─────────
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - id: resolve
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG='${{ inputs.tag }}'
+          else
+            TAG='${{ github.ref_name }}'
+          fi
+          # Se valida el formato porque el valor acaba interpolado en el
+          # `ref` del checkout. Un tag con una barra o un espacio rompería
+          # eso de formas poco obvias.
+          if ! printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::Tag '$TAG' no sigue vMAJOR.MINOR.PATCH[-prerelease]."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Publicando $TAG"
+
+  # ───────── Desplegar ─────────
+  #
+  # Misma lógica que el Worker de test, línea por línea: deploy.yml es
+  # compartido. Acá el job se DETIENE esperando la aprobación que exige el
+  # environment `production`.
+  deploy:
+    name: deploy to production
+    needs: [version]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      ref: ${{ needs.version.outputs.tag }}
+    secrets: inherit

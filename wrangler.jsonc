@@ -1,5 +1,5 @@
 {
-  "name": "colombiaevaluadorav2",
+  "name": "pigse",
   "compatibility_date": "2026-07-23",
   "main": "./worker/index.js",
   "assets": {
@@ -17,16 +17,68 @@
   "vars": {
     // Mismo servidor que `VITE_APP_API_PROXY_TARGET` usa en dev, pero POR
     // NOMBRE y no por IP: un `fetch` de un Worker a una IP pelada lo rechaza
-    // Cloudflare con "error code: 1003" (Direct IP Access Not Allowed), así que
-    // `http://172.233.184.248:8080` devolvía 403 en todas las llamadas.
+    // Cloudflare con "error code: 1003" (Direct IP Access Not Allowed).
     //
-    // Este hostname es el rDNS que Linode le da a la máquina. Funciona hoy, pero
-    // queda atado a la IP: si el servidor se muda, cambia. Lo correcto a futuro
-    // es un subdominio propio (api-test.colombiaevaluadora.com) apuntando acá.
+    // Este hostname es el rDNS que Linode le da a la máquina. Funciona hoy,
+    // pero queda atado a la IP: si el servidor se muda, cambia.
     //
     // Va en el Worker y no en el bundle porque se resuelve del lado del
     // servidor: el navegador nunca ve esta URL (es HTTP plano y el sitio es
     // HTTPS, así que desde el navegador sería mixed content).
     "API_PROXY_TARGET": "http://172-233-184-248.ip.linodeusercontent.com:8080",
+  },
+
+  // ───────── Entornos con nombre ─────────
+  //
+  // `wrangler deploy --env dev|test|production` (lo que hace
+  // `.github/workflows/deploy.yml`). Sin `--env`, se despliega la config de
+  // arriba: ese es el caso de `wrangler dev` en local.
+  //
+  // Lo que NO se hereda del bloque de arriba y por eso se repite en cada
+  // entorno: `vars` y `routes`. Lo que SÍ se hereda: `main`, `assets`,
+  // `compatibility_date`.
+  //
+  // A diferencia de colombia-evaluadora, acá NINGÚN Worker existía antes de
+  // este pipeline, así que los tres entornos llevan el sufijo sin
+  // excepciones (no hay un nombre legado con el que preservar compatibilidad).
+  "env": {
+    // Vitrina: la app entera contra MSW, sin backend detrás. El flag que la
+    // pone en ese modo es `VITE_APP_ENABLE_API_MOCKING=active`, y NO se
+    // configura acá — es una variable de BUILD (Vite la hornea en el
+    // bundle), así que vive en el secreto ENV_FILE del environment `dev`.
+    "dev": {
+      "name": "pigse-dev",
+      "routes": [
+        { "pattern": "dev.pigse.com", "custom_domain": true },
+      ],
+      "vars": {
+        "API_PROXY_TARGET": "http://172-233-184-248.ip.linodeusercontent.com:8080",
+      },
+    },
+    "test": {
+      "name": "pigse-test",
+      "routes": [
+        { "pattern": "test.pigse.com", "custom_domain": true },
+      ],
+      "vars": {
+        "API_PROXY_TARGET": "http://172-233-184-248.ip.linodeusercontent.com:8080",
+      },
+    },
+    "production": {
+      "name": "pigse-production",
+      // AVISO: `pigse.com` hoy está parkeado en Hostinger, fuera de
+      // Cloudflare. El PRIMER deploy a production falla al atar el dominio
+      // hasta que la zona `pigse.com` esté delegada a Cloudflare (cambiar los
+      // nameservers en el registrador) y el CLOUDFLARE_API_TOKEN tenga
+      // "Zone → Workers Routes: Edit" sobre ella.
+      "routes": [
+        { "pattern": "pigse.com", "custom_domain": true },
+      ],
+      // HTTPS y por hostname (sslip.io resuelve a 2.25.181.178). No usar la
+      // IP pelada: un `fetch` de Worker a IP da "error code: 1003".
+      "vars": {
+        "API_PROXY_TARGET": "https://2-25-181-178.sslip.io",
+      },
+    },
   },
 }

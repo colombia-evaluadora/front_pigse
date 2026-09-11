@@ -1,0 +1,167 @@
+# =============================================================================
+# ci.yml — gate de integración sobre `dev`.
+#
+# Mismo criterio que el CI del SSO (`colombia-evaluadora/SSO`) y el de
+# front_colombia_evaluadora: CI corre SOLO en `dev`. Las ramas `test` y `main`
+# reciben merges YA verificados en `dev`, así que re-verificarlas duplica
+# minutos sin añadir señal.
+#
+#   feature/CU-xxxx → dev → test → main
+#                      │            │
+#                      │            └── tag v* → release.yml → production
+#                      └── deploy-test.yml → Worker de test
+#
+# Los tres checks son los que hay que marcar como "required" si algún día se
+# activa branch protection sobre `dev`/`test`/`main`:
+#
+#   typecheck · lint · build
+#
+# (`format` queda fuera a propósito — ver el bloque comentado más abajo.)
+#
+# Por qué no hay job de tests: el repo no tiene script `test`. Vitest está
+# instalado pero solo como runner de Storybook en modo browser
+# (`@storybook/addon-vitest` + Playwright, ver `vite.config.ts`), que exige
+# descargar navegadores y construir Storybook — varios minutos por run. Queda
+# el bloque comentado al final para cuando se quiera pagar ese costo.
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancela runs obsoletos: si llega un push nuevo al mismo PR mientras
+  # corre, mata el anterior para no gastar minutos del runner.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Los nombres de archivo y los mensajes del repo llevan acentos; sin esto
+  # `tsc`/`oxlint` los escupen mal en el log del runner.
+  LANG: C.UTF-8
+  LC_ALL: C.UTF-8
+
+jobs:
+  # ───────── Typecheck ─────────
+  #
+  # `tsc -b --noEmit` y no `pnpm build`: el build ya hace `tsc -b` pero
+  # además levanta Vite/rolldown (~40 s extra). Separarlos da una señal más
+  # rápida y un check con nombre propio — un error de tipos no debería
+  # reportarse como "build roto".
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          # Fijada a la misma versión que usa la máquina de desarrollo
+          # (mise: pnpm 11.25.0). El repo no declara `packageManager` en
+          # package.json; si algún día lo hace, borrar esta línea y dejar
+          # que la action lo lea de ahí.
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm exec tsc -b --noEmit
+
+  # ───────── Lint ─────────
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Oxlint
+        run: pnpm lint
+
+  # ───────── Formato: NO es un gate todavía ─────────
+  #
+  # Igual que en front_colombia_evaluadora: hasta que el repo no pase una vez
+  # entero por `oxfmt` en un commit dedicado, `format:check` se queda
+  # comentado para no dejar el CI rojo desde el primer run.
+  #
+  #  format:
+  #    name: format
+  #    runs-on: ubuntu-latest
+  #    steps:
+  #      - uses: actions/checkout@v4
+  #      - uses: pnpm/action-setup@v4
+  #        with:
+  #          version: 11.25.0
+  #      - uses: actions/setup-node@v4
+  #        with:
+  #          node-version: '24'
+  #          cache: pnpm
+  #      - name: Install
+  #        run: pnpm install --frozen-lockfile
+  #      - name: Oxfmt (check)
+  #        run: pnpm format:check
+
+  # ───────── Build ─────────
+  #
+  # Construye con las MISMAS variables que un deploy real, pero con valores
+  # de relleno: acá solo interesa que el bundle compile. Los valores de
+  # verdad salen del secreto ENV_FILE del environment y se inyectan en
+  # `deploy.yml`, no acá.
+  #
+  # Sin este `.env`, `src/config/env.ts` cae a sus defaults (que existen para
+  # todas las claves), así que el build pasaría igual — pero entonces CI no
+  # estaría ejercitando la misma ruta de código que producción.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+
+# ───────── Pendiente: tests de Storybook ─────────
+#
+# Descomentar cuando se quiera el check de interacción + a11y en CI. Cuesta
+# ~3-5 min por run (build de Storybook + descarga de Chromium).
+#
+#  storybook-test:
+#    name: storybook-test
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: pnpm/action-setup@v4
+#        with:
+#          version: 11.25.0
+#      - uses: actions/setup-node@v4
+#        with:
+#          node-version: '24'
+#          cache: pnpm
+#      - run: pnpm install --frozen-lockfile
+#      - run: pnpm exec playwright install --with-deps chromium
+#      - run: pnpm build-storybook --quiet
+#      - run: pnpm test-storybook:ci
