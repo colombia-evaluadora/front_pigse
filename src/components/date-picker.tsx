@@ -21,6 +21,15 @@ type PickerBaseProps = VariantProps<typeof inputVariants> & {
   align?: React.ComponentProps<typeof PopoverContent>["align"]
   "aria-invalid"?: boolean
   "aria-describedby"?: string
+  /**
+   * Último día seleccionable — los posteriores quedan deshabilitados en el
+   * calendario (no solo marcados como error tras elegirlos). Por ejemplo,
+   * `maxDate={new Date()}` en "Fecha de nacimiento" evita elegir una fecha
+   * futura.
+   */
+  maxDate?: Date
+  /** Primer día seleccionable -- los anteriores quedan deshabilitados. Por ejemplo, el "Hasta" de un rango usa `minDate` = la fecha "Desde" elegida. */
+  minDate?: Date
 }
 
 type DatePickerProps = PickerBaseProps &
@@ -77,6 +86,8 @@ function DatePicker(props: DatePickerProps) {
     className,
     id,
     disabled,
+    maxDate,
+    minDate,
     "aria-invalid": ariaInvalid,
     "aria-describedby": ariaDescribedby,
   } = props
@@ -159,7 +170,21 @@ function DatePicker(props: DatePickerProps) {
           <TimePickerPanel value={timeValue} onChange={handleChangeTime} />
         ) : (
           <>
-            <Calendar mode="single" selected={dateValue} onSelect={handleSelectDate} locale={es} />
+            <Calendar
+              mode="single"
+              selected={dateValue}
+              onSelect={handleSelectDate}
+              locale={es}
+              disabled={
+                maxDate && minDate
+                  ? [{ after: maxDate }, { before: minDate }]
+                  : maxDate
+                    ? { after: maxDate }
+                    : minDate
+                      ? { before: minDate }
+                      : undefined
+              }
+            />
             {/* En `datetime` la hora va detrás de un botón: el panel de reloj
                 no entra al lado del calendario sin desbordar el popover. */}
             {mode === "datetime" && (

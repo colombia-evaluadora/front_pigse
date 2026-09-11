@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
-import {
-  buildQuery,
-  parseQuery,
-  sameFilters,
-  type QuerySyntax,
-} from "@/components/search/query-syntax"
+import { buildQuery, parseQuery, sameFilters, type QuerySyntax } from "@/components/search/query-syntax"
 
 /** Retardo del buscador para no navegar en cada tecla. */
 export const SEARCH_DEBOUNCE_MS = 350

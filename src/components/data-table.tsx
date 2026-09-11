@@ -125,8 +125,9 @@ export function DataTable({
   // `inset-y-0 right-0` y sin radio: el bloque va a sangre contra el borde de
   // la tabla, con el alto completo de la fila.
   //
-  // El fondo es el MISMO color del hover de `TableRow` (`bg-muted/50`) pero ya
-  // resuelto sobre la card: acá hace falta opaco, porque el bloque tapa las
+  // El fondo es el MISMO color del hover de `TableRow` (`bg-muted-22`, o sea
+  // muted al 28%) pero ya resuelto sobre la card: acá hace falta opaco,
+  // porque el bloque tapa las
   // columnas que pasan por debajo al scrollear. El mix va `in srgb` porque eso
   // es exactamente lo que hace el navegador al componer un color translúcido
   // sobre el fondo —mezclar en oklab da otro tono y el bloque se nota—.
@@ -154,7 +155,7 @@ export function DataTable({
   const overlayClass = (active = false) =>
     cn(
       "absolute inset-y-0 right-0 z-10 flex items-center gap-1 px-2",
-      insideSubRow ? "bg-muted/20" : "bg-[color-mix(in_srgb,var(--muted)_50%,var(--card))]",
+      insideSubRow ? "bg-muted/20" : "bg-[color-mix(in_srgb,var(--muted)_28%,var(--card))]",
       "transition-opacity",
       active
         ? "opacity-100"

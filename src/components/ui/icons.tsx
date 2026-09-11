@@ -20,6 +20,7 @@ import {
   MdAutorenew,
   MdBackspace,
   MdBadge,
+  MdBlock,
   MdBolt,
   MdBarChart,
   MdBubbleChart,
@@ -30,6 +31,7 @@ import {
   MdChat,
   MdChatBubbleOutline,
   MdCheck,
+  MdCheckCircle,
   MdCircle,
   MdClose,
   MdContacts,
@@ -40,6 +42,7 @@ import {
   MdDescription,
   MdDragIndicator,
   MdOutlineFileDownload,
+  MdOutlineFileUpload,
   MdOutlineBorderColor,
   MdOutlineDelete,
   MdEmojiEvents,
@@ -48,10 +51,12 @@ import {
   MdOutlineChromeReaderMode,
   MdOutlineControlPoint,
   MdOutlineImage,
+  MdOutlineInsertLink,
   MdOutlineEmail,
   MdErrorOutline,
   MdOutlineFilterList,
   MdFolderOpen,
+  MdOutlinePermMedia,
   MdFormatBold,
   MdFormatItalic,
   MdFormatListNumbered,
@@ -63,6 +68,7 @@ import {
   MdHelpOutline,
   MdHome,
   MdHomeWork,
+  MdOutlineInbox,
   MdInfoOutline,
   MdKey,
   MdKeyboardArrowDown,
@@ -88,10 +94,13 @@ import {
   MdPeople,
   MdPictureAsPdf,
   MdPersonOutline,
+  MdOutlinePersonAddAlt,
+  MdOutlinePersonRemove,
   MdPlace,
   MdPsychology,
   MdPublic,
   MdRadioButtonUnchecked,
+  MdRemoveCircleOutline,
   MdRefresh,
   MdRemove,
   MdOutlineRemoveModerator,
@@ -105,6 +114,7 @@ import {
   MdTableChart,
   MdTimelapse,
   MdTransgender,
+  MdTrendingDown,
   MdTrendingUp,
   MdUnfoldMore,
   MdVerifiedUser,
@@ -155,6 +165,7 @@ export const CalendarIcon = makeIcon(MdCalendarMonth)
 export const ChalkboardTeacherIcon = makeIcon(MdCoPresent)
 export const ChartBarIcon = makeIcon(MdBarChart)
 export const ChartLineUpIcon = makeIcon(MdTrendingUp)
+export const ChartLineDownIcon = makeIcon(MdTrendingDown)
 export const CaretDownIcon = makeIcon(MdKeyboardArrowDown)
 export const CaretLeftIcon = makeIcon(MdKeyboardArrowLeft)
 export const CaretRightIcon = makeIcon(MdKeyboardArrowRight)
@@ -163,6 +174,8 @@ export const CaretUpIcon = makeIcon(MdKeyboardArrowUp)
 export const ChatCircleDotsIcon = makeIcon(MdChatBubbleOutline)
 export const ChatCircleTextIcon = makeIcon(MdChat)
 export const CheckCircleIcon = makeIcon(MdCheckCircleOutline)
+export const CheckCircleFillIcon = makeIcon(MdCheckCircle)
+export const ProhibitIcon = makeIcon(MdBlock)
 export const CheckIcon = makeIcon(MdCheck)
 export const CircleDashedIcon = makeIcon(MdRadioButtonUnchecked)
 export const CircleHalfIcon = makeIcon(MdContrast)
@@ -189,6 +202,7 @@ export const EyeIcon = makeIcon(MdVisibility)
 export const EyeSlashIcon = makeIcon(MdVisibilityOff)
 // `FileDownloadOutlined` de MUI: el de las acciones de exportar.
 export const FileDownloadOutlinedIcon = makeIcon(MdOutlineFileDownload)
+export const FileUploadOutlinedIcon = makeIcon(MdOutlineFileUpload)
 export const FilePdfIcon = makeIcon(MdPictureAsPdf)
 export const FileTextIcon = makeIcon(MdDescription)
 export const FileXlsIcon = makeIcon(MdTableChart)
@@ -204,7 +218,9 @@ export const HouseIcon = makeIcon(MdHome)
 export const HouseLineIcon = makeIcon(MdHomeWork)
 export const IdentificationCardIcon = makeIcon(MdBadge)
 export const ImageIcon = makeIcon(MdOutlineImage)
+export const InboxIcon = makeIcon(MdOutlineInbox)
 export const InfoIcon = makeIcon(MdInfoOutline)
+export const InsertLinkOutlinedIcon = makeIcon(MdOutlineInsertLink)
 export const KeyIcon = makeIcon(MdKey)
 export const LightningIcon = makeIcon(MdBolt)
 export const LockIcon = makeIcon(MdLockOutline)
@@ -222,14 +238,16 @@ export const PaletteIcon = makeIcon(MdPalette)
 export const PasswordIcon = makeIcon(MdOutlinePassword)
 export const PaperPlaneTiltIcon = makeIcon(MdOutlineSend)
 export const PaperclipIcon = makeIcon(MdAttachFile)
-// Equivalentes de `BorderColorOutlined` y `DeleteOutlined` de MUI: los dos
-// vienen del mismo set (Material), así que `react-icons/md` los trae con el
-// prefijo `MdOutline`. Se repunta acá y no en cada uso para que el lápiz y el
-// tacho sean los mismos en toda la app (acciones de fila, diálogos, filtros).
+// Equivalentes de `BorderColorOutlined`, `DeleteOutlined` y `PermMediaOutlined`
+// de MUI: los tres vienen del mismo set (Material), así que `react-icons/md`
+// los trae con el prefijo `MdOutline`. Se repunta acá y no en cada uso para
+// que queden consistentes en toda la app (acciones de fila, diálogos, filtros).
 export const PencilIcon = makeIcon(MdOutlineBorderColor)
+export const PermMediaOutlinedIcon = makeIcon(MdOutlinePermMedia)
 export const PlusCircleIcon = makeIcon(MdAddCircleOutline)
 export const PlusIcon = makeIcon(MdAdd)
 export const QuestionIcon = makeIcon(MdHelpOutline)
+export const RemoveCircleOutlineIcon = makeIcon(MdRemoveCircleOutline)
 export const ShieldCheckIcon = makeIcon(MdVerifiedUser)
 export const ShieldIcon = makeIcon(MdOutlineShield)
 export const ShieldOffIcon = makeIcon(MdOutlineRemoveModerator)
@@ -247,6 +265,8 @@ export const TreeIcon = makeIcon(MdPark)
 export const TrophyIcon = makeIcon(MdEmojiEvents)
 export const VideoIcon = makeIcon(MdOutlineSmartDisplay)
 export const PersonIcon = makeIcon(MdPersonOutline)
+export const PersonAddIcon = makeIcon(MdOutlinePersonAddAlt)
+export const PersonRemoveIcon = makeIcon(MdOutlinePersonRemove)
 export const UserCircleIcon = makeIcon(MdAccountCircle)
 export const UserGroupAddIcon = makeIcon(MdGroupAdd)
 export const UserIcon = makeIcon(MdPersonOutline)

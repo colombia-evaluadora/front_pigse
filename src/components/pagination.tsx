@@ -132,7 +132,10 @@ export function Pagination({
         </PaginationContent>
       </UIPagination>
       <Field orientation="horizontal" className="hidden w-fit lg:flex">
-        <Select value={`${pageSize}`} onValueChange={(value) => onPageSizeChange(Number(value))}>
+        <Select
+          value={`${pageSize}`}
+          onValueChange={(value) => onPageSizeChange(Number(value))}
+        >
           <SelectTrigger id="rows-per-page" variant="outlined" className="bg-muted/50 w-17">
             <SelectValue />
           </SelectTrigger>
@@ -146,10 +149,14 @@ export function Pagination({
             </SelectGroup>
           </SelectContent>
         </Select>
-        <FieldLabel htmlFor="rows-per-page" className="text-sm normal-case text-muted-foreground">
+        <FieldLabel
+          htmlFor="rows-per-page"
+          className="text-sm normal-case text-muted-foreground"
+        >
           Entradas
         </FieldLabel>
       </Field>
+
 
       {viewOptions}
     </div>
