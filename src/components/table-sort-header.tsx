@@ -40,6 +40,7 @@ interface TableSortableHeaderProps<K extends string> {
   sortKey: K
   sort: TableSort<K>
   onSortChange: (next: TableSort<K>) => void
+  titleClassName?: string
 }
 
 export function TableSortableHeader<K extends string>({
@@ -47,6 +48,7 @@ export function TableSortableHeader<K extends string>({
   sortKey,
   sort,
   onSortChange,
+  titleClassName,
 }: TableSortableHeaderProps<K>) {
   const active = sort?.key === sortKey ? sort.dir : null
   return (
@@ -65,7 +67,9 @@ export function TableSortableHeader<K extends string>({
             />
           }
         >
-          <span>{title}</span>
+          <span className={titleClassName} title={titleClassName ? title : undefined}>
+            {title}
+          </span>
           {active === "desc" ? (
             <ArrowDownIcon data-icon="inline-end" />
           ) : active === "asc" ? (

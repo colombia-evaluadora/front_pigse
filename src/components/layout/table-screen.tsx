@@ -105,7 +105,7 @@ function TableScreenTitle({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-4 border-b border-border bg-muted/10 px-(--screen-spacing) py-4",
+        "flex items-center justify-between gap-4 border-b border-border bg-table-screen-title px-(--screen-spacing) py-4",
         className,
       )}
     >

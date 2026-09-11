@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import { CheckIcon, FunnelIcon } from "@/components/ui/icons"
+import { CheckIcon, FunnelIcon, XIcon } from "@/components/ui/icons"
 import { Button } from "@/components/ui/button"
 import { InputGroupButton } from "@/components/ui/input-group"
 import {
@@ -39,6 +39,13 @@ interface AdvancedFiltersPopoverProps {
   formId?: string
   onApply?: () => void
   /**
+   * Deshabilita "Aplicar filtros" -- para buscadores donde una combinación
+   * de campos a medio llenar no es un filtro válido (ver `SearchSeguimiento`,
+   * que exige jornada+grado+grupo+asignatura completos). Por defecto
+   * `false`: no todos los buscadores necesitan esta validación.
+   */
+  applyDisabled?: boolean
+  /**
    * Ancho del panel según cuánto tenga que mostrar. `sm` para uno o dos
    * controles —un panel ancho con un solo select es casi todo espacio en
    * blanco—; `lg` cuando hay secciones que repartir en columnas.
@@ -55,6 +62,7 @@ export function AdvancedFiltersPopover({
   badgeCount,
   formId,
   onApply,
+  applyDisabled = false,
   size = "lg",
   children,
   className,
@@ -103,10 +111,20 @@ export function AdvancedFiltersPopover({
           design system es versalita —pensado para popovers chicos—, y acá
           encabeza un panel entero.
         */}
-        <PopoverHeader className="px-4 pt-4">
+        <PopoverHeader className="flex-row items-center justify-between px-4 pt-4">
           <PopoverTitle className="text-xl font-semibold normal-case">
             Filtros avanzados
           </PopoverTitle>
+          <Button
+            type="button"
+            variant="fill"
+            color="neutral"
+            size="icon-xs"
+            aria-label="Cerrar filtros avanzados"
+            onClick={() => onOpenChange(false)}
+          >
+            <XIcon />
+          </Button>
         </PopoverHeader>
 
         {/*
@@ -134,6 +152,7 @@ export function AdvancedFiltersPopover({
             form={formId}
             color="primary"
             size="sm"
+            disabled={applyDisabled}
             onClick={onApply}
           >
             <CheckIcon data-icon="inline-start" />

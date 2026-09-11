@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  buildQuery,
-  optionsTerm,
-  parseQuery,
-  type QuerySyntax,
-} from "@/components/search/query-syntax"
+import { buildQuery, optionsTerm, parseQuery, type QuerySyntax } from "@/components/search/query-syntax"
 
 interface Filtros {
   search: string

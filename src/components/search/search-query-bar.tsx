@@ -45,6 +45,8 @@ interface SearchQueryBarProps {
   formId?: string
   /** …o llama a esto, si el panel no tiene un `<form>` propio. */
   onApply?: () => void
+  /** Deshabilita "Aplicar filtros" -- ver `AdvancedFiltersPopover`. */
+  applyDisabled?: boolean
   /** Ancho del panel de filtros. */
   size?: "sm" | "lg"
   /** Ancho de la barra; por defecto la misma medida en todos los listados. */
@@ -65,6 +67,7 @@ export function SearchQueryBar({
   onOpenChange,
   formId,
   onApply,
+  applyDisabled,
   size,
   className,
   children,
@@ -111,6 +114,7 @@ export function SearchQueryBar({
           badgeCount={badgeCount}
           formId={formId}
           onApply={onApply}
+          applyDisabled={applyDisabled}
           size={size}
         >
           {children}

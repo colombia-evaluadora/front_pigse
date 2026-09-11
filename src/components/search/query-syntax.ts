@@ -226,7 +226,9 @@ export function optionsTerm<F extends object>(
       //
       // Distinto del caso de abajo (`labelOf`): ahí el catálogo SÍ está y el
       // valor no figura, que es un dato real y conviene mostrarlo.
-      options.length === 0 ? [] : valuesOf(filters, field).map((value) => labelOf(options, value)),
+      options.length === 0
+        ? []
+        : valuesOf(filters, field).map((value) => labelOf(options, value)),
     fromValue: (value, draft) => {
       const matches = matchOptions(options, value)
       if (matches.length === 0) return undefined

@@ -52,7 +52,7 @@ export const actionsSpacerHeadCell = (
 export const actionsOverlayClass = (active = false) =>
   cn(
     "absolute inset-y-0 right-0 z-10 flex items-center gap-1 px-2 transition-opacity",
-    "bg-[color-mix(in_srgb,var(--muted)_50%,var(--popover))]",
+    "bg-[color-mix(in_srgb,var(--muted)_28%,var(--popover))]",
     active
       ? "opacity-100"
       : "opacity-0 group-hover/row:opacity-100 group-has-[:focus-visible]/row:opacity-100",

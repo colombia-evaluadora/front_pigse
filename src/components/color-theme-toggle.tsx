@@ -15,9 +15,7 @@ export function ColorThemeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="outline" size="icon" color="muted" className="bg-background" />}
-      >
+      <DropdownMenuTrigger render={<Button variant="outline" size="icon" color="muted" className="bg-background" />}>
         <PaletteIcon className="size-[1.2rem]" />
         <span className="sr-only">Cambiar paleta de color</span>
       </DropdownMenuTrigger>
