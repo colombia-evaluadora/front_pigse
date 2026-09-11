@@ -10,7 +10,7 @@ import { router } from "@/router"
 export function AppProvider() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
+      <ThemeProvider defaultColorTheme="red">
         <TooltipProvider>
           <RouterContextProvider router={router}>
             <HeadContent />
