@@ -126,4 +126,13 @@ export const SUCCESS_MESSAGES = {
     /** Eliminar la versión vigente (la anterior pasa al historial). */
     deleted: "El documento se eliminó correctamente.",
   },
+  campus: {
+    created: "La sede educativa se creó correctamente.",
+    updated: "La sede educativa se actualizó correctamente.",
+    deleted: "La sede educativa se eliminó correctamente.",
+    deletedMany: (count) =>
+      count === 1
+        ? "La sede educativa se eliminó correctamente."
+        : `Las ${count} sedes educativas se eliminaron correctamente.`,
+  },
 } satisfies Record<string, EntityMessages>
