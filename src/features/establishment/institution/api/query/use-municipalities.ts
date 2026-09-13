@@ -26,7 +26,7 @@ async function fetchMunicipalities(): Promise<Municipality[]> {
   }
   // `api` (no `fetch` crudo): agrega el `Authorization: Bearer <token>` que
   // el gateway real exige — sin eso responde 403 antes de llegar a la query.
-  const response = (await api.get("/eval-col/catalogos/municipios")) as unknown as
+  const response = (await api.get("/pigse/catalogos/municipios")) as unknown as
     | { rows: RealMunicipalityRow[] }
     | RealMunicipalityRow[]
   const rows = unwrapRows<RealMunicipalityRow>(response)

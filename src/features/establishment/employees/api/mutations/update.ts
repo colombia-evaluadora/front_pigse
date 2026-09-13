@@ -113,14 +113,14 @@ export function update(
 ): Promise<{ status: "ok" | "error"; message: string; employee: Employee }> {
   const url = apiPath(
     `/establishments/employees/${employeeId}`,
-    `/establecimientos/funcionarios/${employeeId}`,
+    `/funcionarios/${employeeId}`,
   )
 
   if (env.ENABLE_API_MOCKING) return api.put(url, toOutgoingPayload(values))
 
   if (foto) {
     return patchMultipart(
-      `/eval-col/establecimientos/funcionarios/${employeeId}`,
+      `/pigse/funcionarios/${employeeId}`,
       toOutgoingPayload(values),
       {
         fkTarchivoFoto: foto,

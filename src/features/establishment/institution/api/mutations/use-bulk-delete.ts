@@ -36,7 +36,7 @@ function bulkDeleteEstablishments(ids: number[]): Promise<BulkDeleteEstablishmen
       data: ids,
     }) as unknown as Promise<BulkDeleteEstablishmentResult>
   }
-  return api.post("/eval-col/establecimientos/bulk-delete", { pks: ids })
+  return api.post("/pigse/establecimientos/bulk-delete", { pks: ids })
 }
 
 export interface BulkDeleteEstablishmentSummary {
