@@ -1,5 +1,6 @@
 import { authHandlers } from "@/mocks/handlers/auth"
 import { establishmentHandlers } from "@/mocks/handlers/establishments"
+import { campusHandlers } from "@/mocks/handlers/campuses"
 import { employeeHandlers } from "@/mocks/handlers/employees"
 import { catalogHandlers } from "@/mocks/handlers/catalog"
 import { rolesHandlers } from "@/mocks/handlers/roles"
@@ -12,6 +13,7 @@ export const handlers = [
   ...authHandlers,
   ...reportesHandlers,
   ...establishmentHandlers,
+  ...campusHandlers,
   ...employeeHandlers,
   ...catalogHandlers,
   ...rolesHandlers,

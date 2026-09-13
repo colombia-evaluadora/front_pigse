@@ -39,6 +39,7 @@ reportApi.interceptors.request.use(authRequestInterceptor)
 export type ReportKey =
   | "funcionarios"
   | "establecimientos"
+  | "sedes"
   | "periodos-academicos"
   | "periodos-evaluacion"
 
