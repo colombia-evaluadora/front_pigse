@@ -174,9 +174,9 @@ async function fetchEstablishment(id: number): Promise<EstablishmentQueryResult>
     return { ...result, principalEmployee: null, secretaryEmployee: null }
   }
 
-  // fn_est_buscar_por_pk (V53) — fila cruda envuelta en {rows:[...]}.
+  // GET /establecimientos/:id (pigse) — fila cruda envuelta en {rows:[...]}.
   const row = unwrapRow<RealEstablishmentDetailRow>(
-    (await api.get(`/eval-col/establecimientos/${id}`)) as unknown as
+    (await api.get(`/pigse/establecimientos/${id}`)) as unknown as
       | { rows: RealEstablishmentDetailRow[] }
       | RealEstablishmentDetailRow,
   )
