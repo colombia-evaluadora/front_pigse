@@ -4,12 +4,20 @@ import { postMultipart } from "@/lib/files"
 import type { Person } from "@/features/establishment/employees/api/types/person"
 
 /**
- * Contrato real de POST /register/funcionario (auth-center, Java —
+ * Contrato real de POST /register/pigse/funcionario (auth-center, Java —
  * RegisterUsuarioRequest/RegisterResponse en
  * auth-center/src/main/java/com/co/eurekatic/auth/web/dto). Crea `public.users`
- * + TUSUARIO + TFUNCIONARIO (con FK_ESTABLECIMIENTO NULL, "pendiente de
- * enlazar") en una sola transacción — NO pasa por nuestro `query`, es un
- * endpoint del servicio de auth.
+ * + `pigse.TUSUARIO` + `pigse.TFUNCIONARIO` (con FK_TESTABLECIMIENTO NULL,
+ * "pendiente de enlazar") en una sola transacción — NO pasa por nuestro
+ * `query`, es un endpoint del servicio de auth.
+ *
+ * V360 — antes esta app llamaba al endpoint COMPARTIDO
+ * `/register/funcionario`, que escribe en `academico_test.*` (el esquema de
+ * Colombia Evaluadora) sin importar qué front lo llamara: un bug real, no
+ * cosmético, que dejaba el alta de rector/secretaria de PIGSE en el esquema
+ * equivocado. `/register/pigse/funcionario` es la ruta propia de esta app
+ * (mismo `RegisterUsuarioRequest`, mismo contrato de negocio), que escribe
+ * en `pigse.*` vía `PigseJdbcRepository`/`pigse.fn_fun_crear`.
  *
  * REV: el body es `RegisterUsuarioRequest` PLANO — ya NO va envuelto en
  * `{usuario: {...}}` ni lleva `fkTmunicipioExpedicion` (confirmado tras el
@@ -63,12 +71,12 @@ function toRegisterFuncionarioRequest(person: Person) {
  * `FILE:perfilUsuario` en `param_types`; cualquier otro lo rechaza
  * `file-service` con 400 antes de tocar S3.
  *
- * Con foto la petición va por `file-service` (`/files/register/funcionario`),
+ * Con foto la petición va por `file-service` (`/files/register/pigse/funcionario`),
  * que sube el binario, lo registra en `TARCHIVO` y sustituye el campo por su
  * `pk_tarchivo` antes de reenviar a auth-center. Ojo con la URL: este destino
  * es un `endpoint` de auth-center, no una `query`, así que **no lleva prefijo
- * de microservicio** — ni `/auth` ni `/eval-col`, a diferencia de la ruta
- * directa de abajo.
+ * de microservicio** — ni `/auth` ni `/pigse` (el de query-service), a
+ * diferencia de la ruta directa de abajo.
  */
 export async function registerFuncionario(
   person: Person,
@@ -77,18 +85,18 @@ export async function registerFuncionario(
   const body = toRegisterFuncionarioRequest(person)
 
   if (foto) {
-    return postMultipart<RegisterFuncionarioResult>("/register/funcionario", body, {
+    return postMultipart<RegisterFuncionarioResult>("/register/pigse/funcionario", body, {
       fkTarchivoFoto: foto,
     })
   }
 
-  // El gateway enruta hacia auth-center por `requesturi: /api/auth/**`
-  // (tabla `microservice`) — sin el segmento `/auth` la petición no
-  // matchea ese patrón y el gateway responde 404 antes de llegar al
-  // servicio, aunque el endpoint (`/register/funcionario`) sí está
-  // registrado ahí. Confirmado probando ambas formas contra el backend
-  // real.
-  return api.post("/auth/register/funcionario", body)
+  // El gateway enruta hacia auth-center por `Path=/api/auth/register/**`
+  // (StripPrefix=2) — sin el segmento `/auth` la petición no matchea ese
+  // patrón y el gateway responde 404 antes de llegar al servicio, aunque
+  // el endpoint (`/register/pigse/funcionario`) sí está registrado ahí.
+  // Path bajo `/register/pigse/**`, no `/pigse/register/**`, a propósito:
+  // esa regla de gateway solo reenvía lo que cae bajo `/register/**`.
+  return api.post("/auth/register/pigse/funcionario", body)
 }
 
 // `enlazarFuncionarioEstablecimiento` (POST /funcionario/enlazar-establecimiento,
@@ -106,9 +114,18 @@ export async function registerFuncionario(
  * motivó esto: `add-establishment-page.tsx` registra al rector/secretaria
  * PRIMERO (necesita su `pkFuncionario` para `fn_est_crear`), y si crear o
  * enlazar el establecimiento falla DESPUÉS, ese `TFUNCIONARIO` quedaba
- * huérfano para siempre (`FK_ESTABLECIMIENTO` nunca se llenaba, y no había
+ * huérfano para siempre (`FK_TESTABLECIMIENTO` nunca se llenaba, y no había
  * forma de cancelarlo desde el front) — confirmado en datos reales
- * (`fn_fun_cancelar_pendiente`, V51 REV4).
+ * (`pigse.fn_fun_cancelar_pendiente`, V360, espejo de
+ * `academico_test.fn_fun_cancelar_pendiente` V51 REV5).
+ *
+ * V360 — antes esta función llamaba a `/eval-col/funcionario/cancelar-pendiente`
+ * (el endpoint de Colombia Evaluadora, copiado sin adaptar): cancelaba —o
+ * simplemente fallaba contra— un `PK_TFUNCIONARIO` de `academico_test.TFUNCIONARIO`
+ * que nunca fue el que esta app creó. El prefijo correcto es `/pigse`, el
+ * mismo microservicio que ya usan sedes/funcionarios/establecimientos de
+ * esta app (ver `AUDIT_API_PREFIX` en `api-paths.ts` para el equivalente de
+ * auditoría, que sí se corrigió antes).
  *
  * Solo cancela pendientes de verdad: si el `TFUNCIONARIO` ya está enlazado
  * a un EE, la función SQL lo rechaza (22023) — nunca puede usarse para dar
@@ -118,5 +135,5 @@ export async function registerFuncionario(
 export async function cancelarFuncionarioPendiente(
   pkFuncionario: number,
 ): Promise<{ pkFuncionarioCancelado: number }> {
-  return api.post("/eval-col/funcionario/cancelar-pendiente", { pkFuncionario })
+  return api.post("/pigse/funcionario/cancelar-pendiente", { pkFuncionario })
 }

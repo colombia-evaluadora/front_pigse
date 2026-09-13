@@ -109,7 +109,7 @@ interface RealCreateRow {
 }
 
 /**
- * Con escudo el alta va por `file-service` (`/files/eval-col/...`) como
+ * Con escudo el alta va por `file-service` (`/files/pigse/...`) como
  * multipart: el binario sube a S3, queda registrado en `TARCHIVO` con
  * clasificación `escudo` y el campo `logo` se sustituye por su `pk_tarchivo`
  * antes de llegar a `fn_est_crear`. Sin escudo se manda el JSON de siempre —
@@ -117,6 +117,12 @@ interface RealCreateRow {
  *
  * El nombre `logo` no es decorativo: es el único declarado como
  * `FILE:escudo` en `param_types`, y cualquier otro se rechaza con 400.
+ *
+ * V360 — antes esto llamaba a `/eval-col/establecimientos` (el prefijo del
+ * microservicio de Colombia Evaluadora, copiado sin adaptar): con escudo, el
+ * alta de un establecimiento de PIGSE terminaba en `fn_est_crear` de
+ * `academico_test`, no en `pigse.fn_est_crear`. El prefijo correcto es
+ * `/pigse`, el mismo que ya usa la rama sin escudo (línea de abajo).
  */
 export async function create(
   values: EstablishmentDetails,
@@ -128,7 +134,7 @@ export async function create(
   const payload = toOutgoingPayload(values)
   const response = (logo && !env.ENABLE_API_MOCKING
     ? await postMultipart<RealCreateRow | { rows: RealCreateRow[] }>(
-        "/eval-col/establecimientos",
+        "/pigse/establecimientos",
         payload,
         { logo },
       )
@@ -166,7 +172,8 @@ export function updateEstablishment(
   // Reemplazar el escudo es el mismo PATCH parcial, solo que multipart:
   // `fn_est_actualizar` únicamente toca las columnas cuyo parámetro llegó
   // no-NULL, así que mandar el resto del establecimiento no lo pisa.
+  // V360 — mismo bug que en `create`: era `/eval-col/...`, corregido a `/pigse/...`.
   return logo
-    ? patchMultipart(`/eval-col/establecimientos/${establishmentId}`, payload, { logo })
+    ? patchMultipart(`/pigse/establecimientos/${establishmentId}`, payload, { logo })
     : api.patch(url, payload)
 }
