@@ -1,6 +1,6 @@
 "use no memo"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
 import { DataTable } from "@/components/data-table"
 import { Pagination } from "@/components/pagination"
@@ -25,20 +25,6 @@ import {
 } from "@/features/monitoring/api/types/compliance"
 
 /**
- * Normaliza para comparar: sin mayúsculas y sin tildes.
- *
- * Hace falta lo segundo porque los nombres de los EE vienen de la base con su
- * acentuación real ("Institución Educativa San José") y nadie los escribe con
- * tildes en un buscador. Sin esto, buscar "jose" no encuentra "José".
- */
-function normalizar(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-}
-
-/**
  * Tablero "Monitoreo y cumplimiento institucional": KPIs globales de
  * entrega documental (PEI / PEC / PMI) arriba y detalle por EE abajo.
  *
@@ -46,16 +32,11 @@ function normalizar(texto: string): string {
  * el listado, las tarjetas se van con el contenido en lugar de quedar pegadas
  * arriba comiéndose el viewport.
  *
- * **Filtro y paginación son del CLIENTE, no del servidor.**
- * `GET /pigse/cumplimiento/listar` devuelve el universo entero de una
- * (`fn_pigse_cumplimiento_listar()` no recibe parámetros ni pagina), así que
- * las filas ya están todas en memoria: pedirle otra página al backend sería
- * un round-trip para reordenar datos que ya tenemos.
- *
- * Por lo mismo la paginación va por `TablePaginationProvider` (estado local) y
- * no por los search params de la URL: la variante de URL exige declarar un
- * `validateSearch` en la ruta, y acá no hay nada que compartir por link —
- * el filtro es una ayuda de lectura sobre un dato que llega completo.
+ * **Filtro y paginación son del SERVIDOR** (`POST /cumplimiento/query`,
+ * `fn_cumplimiento_listar_paginado`) — antes esta pantalla pedía el
+ * universo entero con `GET /cumplimiento/listar` y paginaba/filtraba en el
+ * cliente, lo que no escala con cientos de instituciones. Mismo patrón que
+ * `use-campuses.ts`/`table-campuses.tsx`.
  */
 export function MonitoringComplianceTable() {
   return (
@@ -66,60 +47,45 @@ export function MonitoringComplianceTable() {
 }
 
 function MonitoringComplianceTableContent() {
-  const { data: rows = [], isPending, isError, refetch } = useComplianceRowsQuery()
   const { pageIndex, pageSize, goToPage, setPageSize, sorting, setSorting } = useTablePagination()
 
   const [filters, setFilters] = useState<ComplianceFilters>(EMPTY_COMPLIANCE_FILTERS)
 
-  // Cuántos filtros hay puestos: alimenta el badge del embudo y decide si el
-  // buscador muestra el botón de "limpiar todo".
   const activeFilterCount =
     (filters.search ? 1 : 0) +
     (filters.pei.length ? 1 : 0) +
     (filters.pec.length ? 1 : 0) +
     (filters.pmi.length ? 1 : 0)
 
-  const filtradas = useMemo(() => {
-    const termino = normalizar(filters.search.trim())
-    // Un filtro vacío no filtra. Uno con valor exige coincidencia exacta de
-    // estado; los tres se combinan con Y (un EE tiene que cumplir todos).
-    const coincideEstado = (elegidos: string[], estado: string) =>
-      elegidos.length === 0 || elegidos.includes(estado)
+  const { data, isPending, isError, refetch } = useComplianceRowsQuery({
+    filters,
+    sorting,
+    pageIndex,
+    pageSize,
+  })
 
-    return rows.filter(
-      (row) =>
-        (!termino || normalizar(row.establishmentName).includes(termino)) &&
-        coincideEstado(filters.pei, row.pei.status) &&
-        coincideEstado(filters.pec, row.pec.status) &&
-        coincideEstado(filters.pmi, row.pmi.status),
-    )
-  }, [rows, filters])
-
-  // Al filtrar, la página en la que estaba el usuario puede no existir más
-  // (filtrar 50 EE a 3 deja una sola página). Sin esto la tabla se queda en
-  // una página vacía y parece que el filtro no encontró nada.
+  // Al cambiar el filtro, la pagina en la que estaba el usuario puede no
+  // existir mas del lado del servidor (filtrar 50 EE a 3 deja una sola
+  // pagina) -- sin esto la tabla pide una pagina vacia y parece que el
+  // filtro no encontro nada.
   useEffect(() => {
     goToPage(0)
-  }, [filters, goToPage])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters])
 
-  const pageCount = Math.max(1, Math.ceil(filtradas.length / pageSize))
-  const paginaActual = Math.min(pageIndex, pageCount - 1)
-  const visibles = useMemo(
-    () => filtradas.slice(paginaActual * pageSize, paginaActual * pageSize + pageSize),
-    [filtradas, paginaActual, pageSize],
-  )
+  const rows = data?.rows ?? []
 
   const { table } = useDataTable({
     columns,
-    data: visibles,
-    pageCount,
-    pageIndex: paginaActual,
+    data: rows,
+    pageCount: data?.pageCount ?? -1,
+    pageIndex,
     pageSize,
     goToPage,
     setPageSize,
     sorting,
     setSorting,
-    getRowId: (row) => String(row.id),
+    getRowId: (row: ComplianceRow) => String(row.id),
   })
 
   return (
@@ -155,11 +121,11 @@ function MonitoringComplianceTableContent() {
         />
 
         <Pagination
-          pageIndex={paginaActual}
-          pageCount={pageCount}
-          canPrev={paginaActual > 0}
-          canNext={paginaActual < pageCount - 1}
-          totalCount={filtradas.length}
+          pageIndex={pageIndex}
+          pageCount={data?.pageCount ?? 1}
+          canPrev={pageIndex > 0}
+          canNext={pageIndex < (data?.pageCount ?? 1) - 1}
+          totalCount={data?.totalCount ?? 0}
           pageSize={pageSize}
           onPageChange={goToPage}
           onPageSizeChange={setPageSize}
