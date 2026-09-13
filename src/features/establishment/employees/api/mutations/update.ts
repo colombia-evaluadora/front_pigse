@@ -93,7 +93,7 @@ function toOutgoingPayload(values: Employee) {
 }
 
 /**
- * PATCH, no PUT: `PUT /establecimientos/funcionarios/:ID` ya es la baja
+ * PATCH, no PUT: `PUT /funcionarios/:ID` ya es la baja
  * lógica (`fn_fun_baja_establecimiento`, ver use-delete.ts) — el PATCH es
  * el update integral de campos.
  *
