@@ -1,7 +1,9 @@
 /**
  * Traducciones entre lo que espera la UI de auditoría y lo que realmente
- * sirve el backend (instancia `audit-clickhouse` del query-service,
- * registrada en V84 con `requesturi = /api/audit-ch/**`; las filas de
+ * sirve el backend (instancia `audit-clickhouse-pigse` del query-service,
+ * registrada en V356 con `requesturi = /api/audit-pigse/**` — antes era la
+ * instancia genérica `audit-clickhouse` de V84 en `/api/audit-ch/**`, hasta
+ * que V356/V357 la partieron en dos por esquema, una por app; las filas de
  * catálogo son V85 para `/audit-tables/*` y V86+V90 para `/audits/*`).
  *
  * Este módulo existe porque el contrato real se apartó de la spec del mock
