@@ -12,12 +12,12 @@ export interface DeleteEmployeeResult {
 
 /**
  * PUT, no DELETE: es `fn_fun_baja_establecimiento` (baja lógica), pensado
- * como `PUT /establecimientos/funcionarios/:ID` — ver
+ * como `PUT /funcionarios/:ID` — ver
  * postgres/pending/step4_funcionarios_listar_y_baja.sql (todavía sin
  * aplicar).
  */
 function deleteEmployee(id: number): Promise<DeleteEmployeeResult> {
-  const url = apiPath(`/establishments/employees/${id}`, `/establecimientos/funcionarios/${id}`)
+  const url = apiPath(`/establishments/employees/${id}`, `/funcionarios/${id}`)
   return env.ENABLE_API_MOCKING ? api.delete(url) : api.put(url)
 }
 

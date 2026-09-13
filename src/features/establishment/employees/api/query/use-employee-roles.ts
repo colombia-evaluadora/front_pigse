@@ -26,7 +26,7 @@ async function fetchEmployeeRoles(): Promise<CatalogItem[]> {
   }
   // `api` (no `fetch` crudo): agrega el `Authorization: Bearer <token>` que
   // el gateway real exige — sin eso responde 403 antes de llegar a la query.
-  const response = (await api.get("/eval-col/catalogos/roles")) as unknown as
+  const response = (await api.get("/pigse/catalogos/roles")) as unknown as
     | { rows: RealEmployeeRoleRow[] }
     | RealEmployeeRoleRow[]
   const rows = unwrapRows<RealEmployeeRoleRow>(response)
