@@ -28,3 +28,6 @@ import { env } from "@/config/env"
 export function apiPath(mockPath: string, realPath: string, prefix = "/pigse"): string {
   return env.ENABLE_API_MOCKING ? mockPath : `${prefix}${realPath}`
 }
+
+/** Prefijo de la instancia query-service dedicada a auditoría (V84). */
+export const AUDIT_API_PREFIX = "/audit-ch"

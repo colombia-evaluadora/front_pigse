@@ -26,6 +26,7 @@ const PDF_MINIMO = [
 const NOMBRE_POR_CLAVE: Record<string, string> = {
   funcionarios: "funcionarios",
   establecimientos: "establecimientos",
+  sedes: "sedes",
 }
 
 function fecha() {

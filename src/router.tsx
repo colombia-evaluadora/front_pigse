@@ -9,6 +9,7 @@ import {
 import type { QueryClient } from "@tanstack/react-query"
 
 import { paths } from "@/config/paths"
+import { humanizeSlug } from "@/config/breadcrumbs"
 import { hasSession, USER_QUERY_KEY } from "@/lib/auth"
 import type { AuthUser } from "@/lib/auth-mapper"
 import { canAccessPath, findFirstAllowedPath } from "@/lib/auth-routes"
@@ -23,9 +24,16 @@ import {
   restorePasswordSearchSchema,
 } from "@/features/auth/api/schema"
 import { establishmentsSearchSchema } from "@/features/establishment/institution/api/schema"
+import { campusesSearchSchema } from "@/features/establishment/campuses/api/schema"
 import { employeesSearchSchema } from "@/features/establishment/employees/api/schema"
 import { NoticeProvider } from "@/components/notice/notice-context"
 import { visorSearchSchema } from "@/features/pdf-viewer/api/schema"
+import {
+  auditsSearchSchema,
+  auditTablesSearchSchema,
+  sessionOperationsSearchSchema,
+  tableOperationsSearchSchema,
+} from "@/features/administration/audits/api/schema"
 
 /*const LandingPage = lazyRouteComponent(
   () => import("@/features/landing/pages/landing-page"),
@@ -63,9 +71,31 @@ const EmployeesPage = lazyRouteComponent(
   "EmployeesPage",
 )
 
+const CampusesPage = lazyRouteComponent(
+  () => import("@/features/establishment/campuses/pages/campuses-page"),
+  "CampusesPage",
+)
+
 const RolesMenusPage = lazyRouteComponent(
   () => import("@/features/administration/roles-menus/pages/roles-menus-page"),
   "RolesMenusPage",
+)
+
+const AuditSessionPage = lazyRouteComponent(
+  () => import("@/features/administration/audits/pages/audit-session-page"),
+  "AuditSessionPage",
+)
+const AuditTablesPage = lazyRouteComponent(
+  () => import("@/features/administration/audits/pages/audit-tables-page"),
+  "AuditTablesPage",
+)
+const TableOperationsPage = lazyRouteComponent(
+  () => import("@/features/administration/audits/pages/table-operations-page"),
+  "TableOperationsPage",
+)
+const SessionOperationsPage = lazyRouteComponent(
+  () => import("@/features/administration/audits/pages/session-operations-page"),
+  "SessionOperationsPage",
 )
 
 const AddEstablishmentPage = lazyRouteComponent(
@@ -247,7 +277,11 @@ const appLayoutRoute = createRoute({
 // navegable y la cadena del BreadcrumbList queda completa para Google.
 const ADMINISTRACION_CRUMB = {
   label: "Administración",
-  to: paths.app.rolesMenus.getHref(),
+  to: paths.app.auditoriaSesiones.getHref(),
+}
+const REGISTRO_ACTIVIDAD_CRUMB = {
+  label: "Registro de actividad",
+  to: paths.app.auditoriaSesiones.getHref(),
 }
 const ESTABLECIMIENTO_CRUMB = {
   label: "Establecimiento educativo",
@@ -282,6 +316,73 @@ export const rolesMenusRoute = createRoute({
   component: RolesMenusPage,
 })
 
+// Mismo criterio que `_establishment`: las cuatro vistas de auditoría
+// comparten un `NoticeProvider` para que el aviso de una exportación o de un
+// revert siga visible al moverse entre ellas.
+const auditsLayoutRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  id: "_audits",
+  component: () => (
+    <NoticeProvider>
+      <Outlet />
+    </NoticeProvider>
+  ),
+})
+
+export const auditoriaSesionesRoute = createRoute({
+  getParentRoute: () => auditsLayoutRoute,
+  path: paths.app.auditoriaSesiones.path,
+  validateSearch: auditsSearchSchema,
+  staticData: {
+    breadcrumb: [ADMINISTRACION_CRUMB, REGISTRO_ACTIVIDAD_CRUMB, { label: "Sesiones" }],
+  },
+  component: AuditSessionPage,
+})
+
+export const auditoriaTablasRoute = createRoute({
+  getParentRoute: () => auditsLayoutRoute,
+  path: paths.app.auditoriaTablas.path,
+  validateSearch: auditTablesSearchSchema,
+  staticData: {
+    breadcrumb: [
+      ADMINISTRACION_CRUMB,
+      REGISTRO_ACTIVIDAD_CRUMB,
+      { label: "Tablas" },
+    ],
+  },
+  component: AuditTablesPage,
+})
+
+export const auditoriaTablaDetalleRoute = createRoute({
+  getParentRoute: () => auditsLayoutRoute,
+  path: paths.app.auditoriaTablaDetalle.path,
+  validateSearch: tableOperationsSearchSchema,
+  staticData: {
+    breadcrumb: (params) => [
+      ADMINISTRACION_CRUMB,
+      REGISTRO_ACTIVIDAD_CRUMB,
+      { label: "Tablas", to: paths.app.auditoriaTablas.getHref() },
+      { label: humanizeSlug(params.tableSlug) },
+    ],
+  },
+  component: TableOperationsPage,
+})
+
+export const auditoriaSesionOperacionesRoute = createRoute({
+  getParentRoute: () => auditsLayoutRoute,
+  path: paths.app.auditoriaSesionOperaciones.path,
+  validateSearch: sessionOperationsSearchSchema,
+  staticData: {
+    breadcrumb: [
+      ADMINISTRACION_CRUMB,
+      REGISTRO_ACTIVIDAD_CRUMB,
+      { label: "Sesiones", to: paths.app.auditoriaSesiones.getHref() },
+      { label: "Operaciones" },
+    ],
+  },
+  component: SessionOperationsPage,
+})
+
 // Ruta sin path propio: agrupa establecimientos/funcionarios bajo un
 // único `NoticeProvider` para que un aviso disparado en un formulario de
 // alta/edición siga visible al navegar de vuelta al listado (a diferencia de
@@ -302,6 +403,14 @@ export const establishmentsRoute = createRoute({
   validateSearch: establishmentsSearchSchema,
   staticData: { breadcrumb: [ESTABLECIMIENTO_CRUMB, { label: "Establecimiento" }] },
   component: EstablishmentsPage,
+})
+
+export const campusesRoute = createRoute({
+  getParentRoute: () => establishmentLayoutRoute,
+  path: paths.app.establishments.campuses.path,
+  validateSearch: campusesSearchSchema,
+  staticData: { breadcrumb: [ESTABLECIMIENTO_CRUMB, { label: "Sedes educativas" }] },
+  component: CampusesPage,
 })
 
 export const employeesRoute = createRoute({
@@ -387,12 +496,19 @@ const routeTree = rootRoute.addChildren([
   appLayoutRoute.addChildren([
     appIndexRoute,
     rolesMenusRoute,
+    auditsLayoutRoute.addChildren([
+      auditoriaSesionesRoute,
+      auditoriaTablasRoute,
+      auditoriaTablaDetalleRoute,
+      auditoriaSesionOperacionesRoute,
+    ]),
     establishmentsRoute,
     employeesRoute,
     addEstablishmentRoute,
     editEstablishmentRoute,
     establishmentLayoutRoute.addChildren([
       establishmentsRoute,
+      campusesRoute,
       employeesRoute,
       addEstablishmentRoute,
       editEstablishmentRoute,

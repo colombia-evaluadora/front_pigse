@@ -61,6 +61,11 @@ export const paths = {
           `/app/establecimiento-educativo/editar/${establishmentId}`,
       },
 
+      campuses: {
+        path: "establecimiento-educativo/sedes",
+        getHref: () => "/app/establecimiento-educativo/sedes",
+      },
+
       officials: {
         path: "establecimiento-educativo/funcionarios",
         getHref: () => "/app/establecimiento-educativo/funcionarios",
@@ -107,6 +112,26 @@ export const paths = {
     unauthorized: {
       path: "no-autorizado",
       getHref: () => "/app/no-autorizado",
+    },
+    // Las dos vistas del registro de actividad (por sesión y por tablas)
+    // cuelgan del mismo prefijo `registro-de-actividad` para que el item del
+    // menú pueda marcarse activo en cualquiera de las dos y en sus subrutas.
+    auditoriaSesiones: {
+      path: "registro-de-actividad/sesiones",
+      getHref: () => "/app/registro-de-actividad/sesiones",
+    },
+    auditoriaSesionOperaciones: {
+      path: "registro-de-actividad/sesiones/$sessionId/operaciones",
+      getHref: (sessionId: string) =>
+        `/app/registro-de-actividad/sesiones/${sessionId}/operaciones`,
+    },
+    auditoriaTablas: {
+      path: "registro-de-actividad/tablas",
+      getHref: () => "/app/registro-de-actividad/tablas",
+    },
+    auditoriaTablaDetalle: {
+      path: "registro-de-actividad/tablas/$tableSlug",
+      getHref: (tableSlug: string) => `/app/registro-de-actividad/tablas/${tableSlug}`,
     },
   },
 } as const
