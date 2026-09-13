@@ -29,5 +29,13 @@ export function apiPath(mockPath: string, realPath: string, prefix = "/pigse"): 
   return env.ENABLE_API_MOCKING ? mockPath : `${prefix}${realPath}`
 }
 
-/** Prefijo de la instancia query-service dedicada a auditoría (V84). */
-export const AUDIT_API_PREFIX = "/audit-ch"
+/**
+ * Prefijo de la instancia query-service dedicada a auditoría PIGSE
+ * (microservice `audit-clickhouse-pigse`, `requesturi: /api/audit-pigse/**`,
+ * V356). Antes era `/audit-ch` (V84), la instancia genérica compartida con
+ * CEVAL — V356/V357 la partieron en dos por esquema; CEVAL pasó a
+ * `/audit-cval` (ver front_colombia_evaluadora/src/lib/api-routes.ts) y esta
+ * app a `/audit-pigse`. `/audit-ch` ya no existe: V357 le cambió el
+ * `requesturi` a `audit-clickhouse-cval`, así que llamarlo hoy es un 404.
+ */
+export const AUDIT_API_PREFIX = "/audit-pigse"
