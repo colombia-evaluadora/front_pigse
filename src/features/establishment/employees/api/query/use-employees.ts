@@ -77,7 +77,7 @@ function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
 async function fetchEmployees(params: EmployeesQueryRequest): Promise<EmployeesQueryResponse> {
   if (env.ENABLE_API_MOCKING) {
     const response = await api.query(
-      apiPath("/establishments/employees/query", "/establecimientos/funcionarios/query"),
+      apiPath("/establishments/employees/query", "/funcionarios/query"),
       params,
     )
     return unwrapPaginated(response)
@@ -92,7 +92,7 @@ async function fetchEmployees(params: EmployeesQueryRequest): Promise<EmployeesQ
     pageSize: params.pageSize,
   }
   const response = await api.query(
-    apiPath("/establishments/employees/query", "/establecimientos/funcionarios/query"),
+    apiPath("/establishments/employees/query", "/funcionarios/query"),
     body,
   )
   const result = unwrapPaginated<RealEmployeeListRow>(response)

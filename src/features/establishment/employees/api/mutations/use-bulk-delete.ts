@@ -35,7 +35,7 @@ function bulkDeleteEmployees(ids: number[]): Promise<BulkDeleteEmployeeResult> {
       data: ids,
     }) as unknown as Promise<BulkDeleteEmployeeResult>
   }
-  return api.put("/eval-col/establecimientos/funcionarios/eliminar-multiple", { pks: ids })
+  return api.put("/pigse/establecimientos/funcionarios/eliminar-multiple", { pks: ids })
 }
 
 const REASON_MESSAGES: Record<string, string> = {

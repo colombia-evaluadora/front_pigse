@@ -130,7 +130,7 @@ async function getRealCatalog<T>(catalog: CatalogSlug): Promise<T[]> {
     // agrega `Authorization: Bearer <token>` — sin él, el gateway real
     // rechaza la petición con 403 antes de llegar a la query. `fetch()`
     // directo nunca llevaba ese header.
-    const response = (await api.get(`/eval-col/select/${categoria}`)) as unknown as
+    const response = (await api.get(`/pigse/select/${categoria}`)) as unknown as
       | { rows: RealCatalogRow[] }
       | RealCatalogRow[]
     const rows = unwrapRows<RealCatalogRow>(response)

@@ -132,9 +132,9 @@ export async function fetchEmployee(id: number): Promise<EmployeeQueryResult> {
     return api.get(`/establishments/employees/${id}`)
   }
 
-  // fn_usu_empleado_buscar_por_pk (V51) — fila cruda envuelta en {rows:[...]}.
+  // GET /funcionarios/:id (pigse) — fila cruda envuelta en {rows:[...]}.
   const row = unwrapRow<RealEmployeeDetailRow>(
-    (await api.get(`/eval-col/establecimientos/funcionarios/${id}`)) as unknown as
+    (await api.get(`/pigse/funcionarios/${id}`)) as unknown as
       | { rows: RealEmployeeDetailRow[] }
       | RealEmployeeDetailRow,
   )

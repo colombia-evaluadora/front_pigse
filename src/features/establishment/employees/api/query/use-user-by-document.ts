@@ -102,7 +102,7 @@ export async function findPersonByDocument(
   // El response interceptor de `api` ya desenvuelve `response.data` en
   // runtime (ver api-client.ts); el tipo de Axios no lo refleja, así que
   // se castea igual que en el resto de la app (p. ej. use-bulk-delete.ts).
-  const response = (await api.get("/eval-col/usuarios/autocompletar-por-documento", {
+  const response = (await api.get("/pigse/usuarios/autocompletar-por-documento", {
     params: { fkTlvTipoDocumento: documentTypeId, identificacion: identification },
   })) as unknown as RealAutocompletarRow[] | { rows: RealAutocompletarRow[] }
   const rows = unwrapRows<RealAutocompletarRow>(response)
