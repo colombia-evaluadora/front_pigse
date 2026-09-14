@@ -20,6 +20,11 @@ import { getErrorMessage } from "@/lib/api-client"
 import { useEmployeesFilters } from "@/features/establishment/employees/hooks/use-filters"
 import type { EmployeeListItem } from "@/features/establishment/employees/api/types/employee"
 import { useEmployeesQuery } from "@/features/establishment/employees/api/query/use-employees"
+import { useEmployeeRolesQuery } from "@/features/establishment/employees/api/query/use-employee-roles"
+import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
+import { EMPLOYEE_STATUS_OPTIONS } from "@/features/establishment/employees/api/ui-mappings"
+import { CATALOGS } from "@/lib/catalogs"
+import type { CatalogItem } from "@/types/catalog"
 import {
   useBulkDelete,
   summarizeEmployeeBulkDelete,
@@ -48,6 +53,12 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
 
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useEmployeesFilters()
+
+  // Las mismas fuentes que el formulario de alta/edición y su sub-diálogo de
+  // permisos: roles de la tabla propia de PIGSE (TROL, no TLISTA_VALOR) y
+  // jornadas del catálogo genérico.
+  const { data: roles = [] } = useEmployeeRolesQuery()
+  const { data: workSchedules = [] } = useCatalogQuery<CatalogItem>(CATALOGS.WORK_SCHEDULES)
 
   const { data, isPending, isError, refetch } = useEmployeesQuery({
     filters: queryFilters,
@@ -116,6 +127,9 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
             applyFilters={applyFilters}
             clearAllFilters={clearAllFilters}
             activeFilterCount={activeFilterCount}
+            roles={roles}
+            workSchedules={workSchedules}
+            statuses={EMPLOYEE_STATUS_OPTIONS}
           />
 
           <TableScreenActions>

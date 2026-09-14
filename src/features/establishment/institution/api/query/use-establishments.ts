@@ -26,10 +26,13 @@ import type {
  * tabla funcionaba y el reporte fallaba con 400 sobre los mismos filtros.
  */
 export function toEstablishmentsQueryFilters(filters: EstablishmentsQueryRequest["filters"]) {
-  // `status` viaja tal cual: desde V116 el backend filtra por CÓDIGO de
-  // estado (A, I, S, SC, ST), no por id, así que convertirlo a número
-  // rompería el bind (VARCHAR[]).
-  return { ...filters, status: filters.status ?? [] }
+  // `pigse.fn_est_listar` (V387) NO declara ningun parametro de estado --
+  // a diferencia de lo que asumia un comentario anterior aca, mandar
+  // `status` (aunque sea `[]`) dispara el 400 de "placeholders sin tipo
+  // declarado" en CADA carga de la tabla, encontrado en vivo. Se omite del
+  // body hasta que el backend lo soporte.
+  const { status: _status, ...rest } = filters
+  return rest
 }
 
 interface UseEstablishmentsQueryParams {
@@ -49,8 +52,10 @@ interface RealEstablishmentRow {
   departamento_nombre: string
   fk_municipio: number
   municipio_nombre: string
-  fk_estado: number
-  estado_nombre: string
+  // `fk_tlv_estado_establecimiento` es nullable en pigse.TESTABLECIMIENTO
+  // (V387) -- un establecimiento sin estado asignado todavía manda null.
+  fk_estado: number | null
+  estado_nombre: string | null
 }
 
 function toEstablishment(row: RealEstablishmentRow): Establishment {
@@ -60,7 +65,7 @@ function toEstablishment(row: RealEstablishmentRow): Establishment {
     name: row.nombre,
     department: row.departamento_nombre,
     municipality: row.municipio_nombre,
-    status: String(row.fk_estado),
+    status: row.fk_estado == null ? null : String(row.fk_estado),
     statusLabel: row.estado_nombre,
   }
 }
