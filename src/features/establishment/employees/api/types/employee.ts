@@ -1,8 +1,5 @@
 import type { CatalogItem } from "@/types/catalog"
-import type {
-  Permission,
-  PermissionStatus,
-} from "@/features/establishment/institution/api/types/permission"
+import type { Permission } from "@/features/establishment/institution/api/types/permission"
 import type { Person } from "@/features/establishment/employees/api/types/person"
 
 export const EMPLOYEE_STATUSES = ["ACTIVE", "SUSPENDED"] as const
