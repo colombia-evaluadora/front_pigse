@@ -56,8 +56,12 @@ import {
 import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
 import { useEmployeeQuery } from "@/features/establishment/employees/api/query/use-employee"
 import { useEmployeeRolesQuery } from "@/features/establishment/employees/api/query/use-employee-roles"
-import { useEstablishmentsOptionsQuery } from "@/features/establishment/institution/api/query/use-establishments-options"
 import { useCampusesOptionsQuery } from "@/features/establishment/campuses/api/query/use-campuses-options"
+import {
+  createAdditionalInfoFromEmployee,
+  EmployeeAdditionalInfoForm,
+  type EmployeeAdditionalInfoValue,
+} from "@/features/establishment/employees/components/forms/form-employee-additional-info"
 import type { CatalogItem } from "@/types/catalog"
 import type { Employee } from "@/features/establishment/employees/api/types/employee"
 import type { Person } from "@/features/establishment/employees/api/types/person"
@@ -254,9 +258,35 @@ function createEmptyEmployeeShell(): Omit<Employee, "person"> {
     address: "",
     permissions: [],
     status: "ACTIVE",
-    establishment: null,
-    cargo: null,
   }
+}
+
+function createInitialAdditionalInfo(): EmployeeAdditionalInfoValue {
+  return {
+    employeeClass: null,
+    educationLevel: null,
+    grade: null,
+    highestEducationLevel: null,
+    fundingSource: null,
+    functionalPosition: null,
+    employmentType: null,
+    address: "",
+  }
+}
+
+/** ¿La información complementaria trae algo? -- mismo criterio que CEVAL
+ * para decidir si el botón entra en modo "editar" (lápiz) o "agregar" (+). */
+function hasAdditionalInfoData(value: EmployeeAdditionalInfoValue): boolean {
+  return (
+    value.employeeClass !== null ||
+    value.educationLevel !== null ||
+    value.grade !== null ||
+    value.highestEducationLevel !== null ||
+    value.fundingSource !== null ||
+    value.functionalPosition !== null ||
+    value.employmentType !== null ||
+    value.address.trim() !== ""
+  )
 }
 
 function createPermissionDraft(nextOrder = 1): PermissionDraft {
@@ -271,18 +301,18 @@ function createPermissionDraft(nextOrder = 1): PermissionDraft {
  * `PASSWORD_PLACEHOLDER`, no un dato del backend, y compararla marcaría
  * cambios donde no los hay.
  *
- * A diferencia de CEVAL acá entran `establishment` y `cargo` (columnas
- * reales de `pigse.TFUNCIONARIO`) y NO existe "información complementaria"
- * — PIGSE no tiene esos campos.
+ * Igual que CEVAL desde V390: establecimiento y cargo ya NO se piden acá
+ * (el establecimiento se deriva de la sede al asignar un permiso, y el
+ * cargo lo cubre el rol) — en su lugar entra `additionalInfo`
+ * ("información complementaria", los mismos 8 campos que CEVAL).
  */
 function buildDraftSnapshot(
   person: Person,
-  establishment: CatalogItem | null,
-  cargo: CatalogItem | null,
+  additionalInfo: EmployeeAdditionalInfoValue,
   permissions: Permission[],
 ): string {
   const { password: _password, accountExists: _accountExists, ...personRest } = person
-  return JSON.stringify({ person: personRest, establishment, cargo, permissions })
+  return JSON.stringify({ person: personRest, additionalInfo, permissions })
 }
 
 const permissionDraftSchema = z.object({
@@ -349,12 +379,12 @@ export function ManageEmployeeDialog({
   const [createdEmployeeId, setCreatedEmployeeId] = useState<number | null>(null)
 
   const [person, setPerson] = useState<Person | null>(createEmptyPerson())
-  const [establishment, setEstablishment] = useState<CatalogItem | null>(null)
-  const [cargo, setCargo] = useState<CatalogItem | null>(null)
+  const [additionalInfo, setAdditionalInfo] = useState<EmployeeAdditionalInfoValue>(
+    createInitialAdditionalInfo,
+  )
   const [permissions, setPermissions] = useState<Permission[]>([])
 
   const [personErrors, setPersonErrors] = useState<Record<string, string>>({})
-  const [fieldErrors, setFieldErrors] = useState<{ establishment?: string }>({})
   const [confirmPassword, setConfirmPassword] = useState("")
   const [photo, setPhoto] = useState<File | null>(null)
   const [matchedFuncionarioId, setMatchedFuncionarioId] = useState<number | null>(null)
@@ -367,6 +397,9 @@ export function ManageEmployeeDialog({
   const [isSavingPermissions, setIsSavingPermissions] = useState(false)
   const [originalPermissionIds, setOriginalPermissionIds] = useState<Set<number>>(new Set())
 
+  const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false)
+  const [additionalInfoSaved, setAdditionalInfoSaved] = useState(false)
+
   // Huella de lo último "limpio" (recién cargado o recién guardado). `null`
   // mientras se está dando de alta: en alta siempre hay algo por guardar.
   const cleanSnapshotRef = useRef<string | null>(null)
@@ -374,27 +407,24 @@ export function ManageEmployeeDialog({
   // se decide si el sub-diálogo tiene cambios reales y qué restaurar al
   // cancelarlo.
   const permissionsSnapshotRef = useRef<string>(JSON.stringify([]))
+  // Mismo criterio, para el sub-diálogo de información complementaria.
+  const additionalInfoSnapshotRef = useRef<string>(JSON.stringify(createInitialAdditionalInfo()))
 
   const activeEmployeeId = isEditMode ? (employeeId ?? null) : createdEmployeeId
   const canOpenPermissions = Boolean(activeEmployeeId)
 
   const employeeQuery = useEmployeeQuery(employeeId ?? null, open && isEditMode)
   const { data: roles = [] } = useEmployeeRolesQuery()
-  const { data: cargos = [] } = useCatalogQuery<CatalogItem>(CATALOGS.CARGOS)
   const { data: workSchedules = [] } = useCatalogQuery<CatalogItem>(CATALOGS.WORK_SCHEDULES)
-  const { data: establishments = [] } = useEstablishmentsOptionsQuery(open)
+  // `GET /sedes/opciones` ya viene acotado por lo que el usuario logueado
+  // puede ver -- a diferencia de antes, ya NO se filtra por un
+  // establecimiento elegido a mano (V390: el establecimiento del
+  // funcionario se DERIVA de la sede que se le asigne acá, no al revés).
   const { data: campuses = [] } = useCampusesOptionsQuery(open)
 
   const roleItems = toSelectOptions(roles)
-  const cargoItems = toSelectOptions(cargos)
-  const establishmentItems = toSelectOptions(establishments)
   const workScheduleItems = toSelectOptions(workSchedules)
-  // Solo las sedes del establecimiento elegido -- una sede es siempre de UN
-  // EE (pigse.TSEDE.FK_TESTABLECIMIENTO), asignar un permiso en una sede de
-  // otro EE no tiene sentido.
-  const campusItems = toSelectOptions(
-    campuses.filter((campus) => campus.establishmentId === establishment?.id),
-  )
+  const campusItems = toSelectOptions(campuses)
   const permissionStatusItems = PERMISSION_STATUS_OPTIONS.map((status) => ({
     value: status.code,
     label: status.name,
@@ -425,30 +455,24 @@ export function ManageEmployeeDialog({
       accountExists: true,
       password: PASSWORD_PLACEHOLDER,
     }
-    const loadedEstablishment = employee.establishment ?? null
-    const loadedCargo = employee.cargo ?? null
+    const loadedAdditionalInfo = createAdditionalInfoFromEmployee(employee)
 
     setPerson(loadedPerson)
-    setEstablishment(loadedEstablishment)
-    setCargo(loadedCargo)
+    setAdditionalInfo(loadedAdditionalInfo)
     setPermissions(employee.permissions)
     setOriginalPermissionIds(
       new Set(employee.permissions.map((p) => p.id).filter((id): id is number => id !== undefined)),
     )
     setPermissionDraft(createPermissionDraft(employee.permissions.length + 1))
     setPersonErrors({})
-    setFieldErrors({})
     setPermissionErrors({})
     setConfirmPassword(PASSWORD_PLACEHOLDER)
     setPhoto(null)
     setPermissionsSaved(employee.permissions.length > 0)
-    cleanSnapshotRef.current = buildDraftSnapshot(
-      loadedPerson,
-      loadedEstablishment,
-      loadedCargo,
-      employee.permissions,
-    )
+    setAdditionalInfoSaved(hasAdditionalInfoData(loadedAdditionalInfo))
+    cleanSnapshotRef.current = buildDraftSnapshot(loadedPerson, loadedAdditionalInfo, employee.permissions)
     permissionsSnapshotRef.current = JSON.stringify(employee.permissions)
+    additionalInfoSnapshotRef.current = JSON.stringify(loadedAdditionalInfo)
   }
 
   useEffect(() => {
@@ -458,21 +482,21 @@ export function ManageEmployeeDialog({
 
     if (!isEditMode) {
       setPerson(createEmptyPerson())
-      setEstablishment(null)
-      setCargo(null)
+      setAdditionalInfo(createInitialAdditionalInfo())
       setPermissions([])
       setOriginalPermissionIds(new Set())
       setPermissionDraft(createPermissionDraft())
       setPersonErrors({})
-      setFieldErrors({})
       setPermissionErrors({})
       setConfirmPassword("")
       setPhoto(null)
       setCreatedEmployeeId(null)
       setMatchedFuncionarioId(null)
       setPermissionsSaved(false)
+      setAdditionalInfoSaved(false)
       cleanSnapshotRef.current = null
       permissionsSnapshotRef.current = JSON.stringify([])
+      additionalInfoSnapshotRef.current = JSON.stringify(createInitialAdditionalInfo())
       return
     }
 
@@ -528,6 +552,23 @@ export function ManageEmployeeDialog({
     },
   })
 
+  const updateAdditionalInfoMutation = useUpdate({
+    mutationConfig: {
+      onSuccess: (result) => {
+        if (result.status === "error") {
+          notify(result.message, { variant: "error" })
+          return
+        }
+        notify("Información complementaria actualizada.")
+      },
+      onError: (error) => {
+        notify(getErrorMessage(error) || "No fue posible actualizar la información complementaria.", {
+          variant: "error",
+        })
+      },
+    },
+  })
+
   const isSavingMain =
     createPersonMutation.isPending || createMutation.isPending || updateMutation.isPending
 
@@ -535,9 +576,11 @@ export function ManageEmployeeDialog({
     cleanSnapshotRef.current === null ||
     photo !== null ||
     (person !== null &&
-      buildDraftSnapshot(person, establishment, cargo, permissions) !== cleanSnapshotRef.current)
+      buildDraftSnapshot(person, additionalInfo, permissions) !== cleanSnapshotRef.current)
 
   const hasPermissionsChanges = JSON.stringify(permissions) !== permissionsSnapshotRef.current
+  const hasAdditionalInfoChanges =
+    JSON.stringify(additionalInfo) !== additionalInfoSnapshotRef.current
 
   async function handleMainSave() {
     const draft = person as Person | null
@@ -548,26 +591,19 @@ export function ManageEmployeeDialog({
     }
 
     const nextPersonErrors = computePersonErrors(draft, confirmPassword, photo)
-    const nextFieldErrors: { establishment?: string } = {}
-    if (!establishment) {
-      nextFieldErrors.establishment = "Selecciona el establecimiento."
-    }
 
-    if (Object.keys(nextPersonErrors).length > 0 || Object.keys(nextFieldErrors).length > 0) {
+    if (Object.keys(nextPersonErrors).length > 0) {
       setPersonErrors(nextPersonErrors)
-      setFieldErrors(nextFieldErrors)
       return
     }
     setPersonErrors({})
-    setFieldErrors({})
 
     if (env.ENABLE_API_MOCKING) {
       const payload: Employee = {
         id: activeEmployeeId ?? undefined,
         person: draft,
         ...createEmptyEmployeeShell(),
-        establishment,
-        cargo,
+        ...additionalInfo,
         permissions,
       }
 
@@ -590,12 +626,7 @@ export function ManageEmployeeDialog({
         // El diálogo queda abierto para asignar permisos: lo recién
         // persistido pasa a ser la huella "limpia" y Guardar se esconde
         // hasta que se vuelva a tocar algo.
-        cleanSnapshotRef.current = buildDraftSnapshot(
-          payload.person,
-          establishment,
-          cargo,
-          permissions,
-        )
+        cleanSnapshotRef.current = buildDraftSnapshot(payload.person, additionalInfo, permissions)
         notify(
           permissions.length === 0
             ? "Usuario guardado. Puedes asignar permisos."
@@ -636,19 +667,19 @@ export function ManageEmployeeDialog({
         setPerson(persistedPerson)
       }
 
-      // 2) Establecimiento + cargo + datos de persona -- PUT /funcionarios/:id
-      //    (fn_fun_actualizar). Corre siempre, tanto para fijar el
-      //    establecimiento del recién creado como para editar uno existente.
+      // 2) Datos de persona + información complementaria -- PUT
+      //    /funcionarios/:id (fn_fun_actualizar). Corre siempre. El
+      //    establecimiento NO se fija acá (V390): se deriva de la sede la
+      //    primera vez que se le asigna un permiso.
       await updateFuncionario(funcionarioId as number, {
         id: funcionarioId as number,
         person: draft,
         ...createEmptyEmployeeShell(),
-        establishment,
-        cargo,
+        ...additionalInfo,
       })
 
       setCreatedEmployeeId(funcionarioId)
-      cleanSnapshotRef.current = buildDraftSnapshot(draft, establishment, cargo, permissions)
+      cleanSnapshotRef.current = buildDraftSnapshot(draft, additionalInfo, permissions)
 
       if (!activeEmployeeId) {
         notify(
@@ -771,7 +802,7 @@ export function ManageEmployeeDialog({
       setPermissionsDialogOpen(false)
       permissionsSnapshotRef.current = JSON.stringify(permissions)
       if (person) {
-        cleanSnapshotRef.current = buildDraftSnapshot(person, establishment, cargo, permissions)
+        cleanSnapshotRef.current = buildDraftSnapshot(person, additionalInfo, permissions)
       }
       return
     }
@@ -796,10 +827,13 @@ export function ManageEmployeeDialog({
       setOriginalPermissionIds(new Set([...currentIds, ...createdIds]))
       permissionsSnapshotRef.current = JSON.stringify(nextPermissions)
       if (person) {
-        cleanSnapshotRef.current = buildDraftSnapshot(person, establishment, cargo, nextPermissions)
+        cleanSnapshotRef.current = buildDraftSnapshot(person, additionalInfo, nextPermissions)
       }
       // El listado de funcionarios muestra sede/jornada/estado derivados de
-      // estos permisos: sin invalidar, la tabla de atrás queda vieja.
+      // estos permisos, y el establecimiento del funcionario se acaba de
+      // derivar server-side de la sede recién asignada (V390,
+      // fn_fun_permisos_actualizar) -- sin invalidar, la tabla y el detalle
+      // de atrás quedan viejos.
       void queryClient.invalidateQueries({ queryKey: ["employees"] })
 
       setPermissionsSaved(true)
@@ -827,6 +861,47 @@ export function ManageEmployeeDialog({
       setPermissionErrors({})
     }
     setPermissionsDialogOpen(nextOpen)
+  }
+
+  async function closeAdditionalInfoDialog() {
+    if (env.ENABLE_API_MOCKING || !activeEmployeeId || !person) {
+      setAdditionalInfoSaved(true)
+      setAdditionalInfoDialogOpen(false)
+      additionalInfoSnapshotRef.current = JSON.stringify(additionalInfo)
+      notify(
+        "Información complementaria agregada al borrador. Pulsa Guardar para persistir el funcionario.",
+        { variant: "info" },
+      )
+      return
+    }
+
+    await updateAdditionalInfoMutation.mutateAsync({
+      employeeId: activeEmployeeId,
+      values: {
+        id: activeEmployeeId,
+        person,
+        ...additionalInfo,
+        permissions,
+        status: "ACTIVE",
+      },
+      foto: null,
+    })
+
+    setAdditionalInfoSaved(true)
+    setAdditionalInfoDialogOpen(false)
+    additionalInfoSnapshotRef.current = JSON.stringify(additionalInfo)
+    cleanSnapshotRef.current = buildDraftSnapshot(person, additionalInfo, permissions)
+  }
+
+  /**
+   * Cerrar el sub-diálogo sin guardar descarta el borrador: se restaura la
+   * información complementaria tal como estaba persistida.
+   */
+  function handleAdditionalInfoDialogOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setAdditionalInfo(JSON.parse(additionalInfoSnapshotRef.current))
+    }
+    setAdditionalInfoDialogOpen(nextOpen)
   }
 
   const mainTitle = isEditMode ? "Editar usuario" : "Agregar usuario"
@@ -868,61 +943,6 @@ export function ManageEmployeeDialog({
             }}
           />
 
-          <div className="grid grid-cols-1 gap-x-4 gap-y-2 md:grid-cols-2">
-            <Field
-              orientation="vertical"
-              variant="outlined"
-              data-invalid={fieldErrors.establishment ? "true" : undefined}
-            >
-              <FieldLabel htmlFor="employee-establishment">Establecimiento*</FieldLabel>
-              <ComboboxField
-                id="employee-establishment"
-                value={establishment?.id ?? null}
-                onValueChange={(value) => {
-                  const option = establishments.find((item) => item.id === value)
-                  setEstablishment(option ? { id: option.id, code: "", name: option.name } : null)
-                }}
-                items={toSelectItemsMap(establishmentItems)}
-              >
-                <ComboboxFieldTrigger aria-invalid={Boolean(fieldErrors.establishment)}>
-                  <ComboboxFieldValue placeholder="Seleccionar" />
-                </ComboboxFieldTrigger>
-                <ComboboxFieldContent>
-                  {establishmentItems.map((item) => (
-                    <ComboboxFieldItem key={item.value} value={item.value}>
-                      {item.label}
-                    </ComboboxFieldItem>
-                  ))}
-                </ComboboxFieldContent>
-              </ComboboxField>
-              <FieldError>{fieldErrors.establishment}</FieldError>
-            </Field>
-
-            <Field orientation="vertical" variant="outlined">
-              <FieldLabel htmlFor="employee-cargo">Cargo</FieldLabel>
-              <ComboboxField
-                id="employee-cargo"
-                value={cargo?.id ?? null}
-                onValueChange={(value) => {
-                  const option = cargos.find((item) => item.id === value)
-                  setCargo(option ?? null)
-                }}
-                items={toSelectItemsMap(cargoItems)}
-              >
-                <ComboboxFieldTrigger>
-                  <ComboboxFieldValue placeholder="Seleccionar" />
-                </ComboboxFieldTrigger>
-                <ComboboxFieldContent>
-                  {cargoItems.map((item) => (
-                    <ComboboxFieldItem key={item.value} value={item.value}>
-                      {item.label}
-                    </ComboboxFieldItem>
-                  ))}
-                </ComboboxFieldContent>
-              </ComboboxField>
-            </Field>
-          </div>
-
           <DialogFooter className="flex-row flex-wrap items-center justify-between gap-3 sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               {canOpenPermissions && (
@@ -940,10 +960,26 @@ export function ManageEmployeeDialog({
                   {permissionsSaved ? `Permisos / ${permissions.length}` : "Permisos"}
                 </Button>
               )}
+
+              {canOpenPermissions && permissionsSaved && (
+                <Button
+                  variant="fill"
+                  color="primary"
+                  size="sm"
+                  onClick={() => setAdditionalInfoDialogOpen(true)}
+                >
+                  {additionalInfoSaved ? (
+                    <PencilIcon data-icon="inline-start" />
+                  ) : (
+                    <ControlPointIcon data-icon="inline-start" />
+                  )}
+                  Información complementaria
+                </Button>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
-              {hasUnsavedChanges && !permissionsDialogOpen && (
+              {hasUnsavedChanges && !permissionsDialogOpen && !additionalInfoDialogOpen && (
                 <Button
                   variant="fill"
                   color="primary"
@@ -1264,6 +1300,46 @@ export function ManageEmployeeDialog({
               size="sm"
               onClick={() => handlePermissionsDialogOpenChange(false)}
               disabled={isSavingPermissions}
+            >
+              <XIcon data-icon="inline-start" />
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={additionalInfoDialogOpen} onOpenChange={handleAdditionalInfoDialogOpenChange}>
+        <DialogContent
+          className="w-[min(95vw,56rem)] max-w-none sm:max-w-224 max-h-[85vh] overflow-y-auto overflow-x-hidden"
+          showCloseButton={false}
+        >
+          <DialogHeader>
+            <DialogTitle>Información complementaria</DialogTitle>
+          </DialogHeader>
+
+          <NoticeOutlet />
+
+          <EmployeeAdditionalInfoForm value={additionalInfo} onChange={setAdditionalInfo} />
+
+          <DialogFooter className="justify-end sm:justify-end">
+            {hasAdditionalInfoChanges && (
+              <Button
+                variant="fill"
+                color="primary"
+                size="sm"
+                onClick={() => void closeAdditionalInfoDialog()}
+                disabled={updateAdditionalInfoMutation.isPending}
+              >
+                <CheckIcon data-icon="inline-start" />
+                {updateAdditionalInfoMutation.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            )}
+            <Button
+              variant="fill"
+              color="neutral"
+              size="sm"
+              onClick={() => handleAdditionalInfoDialogOpenChange(false)}
+              disabled={updateAdditionalInfoMutation.isPending}
             >
               <XIcon data-icon="inline-start" />
               Cancelar
