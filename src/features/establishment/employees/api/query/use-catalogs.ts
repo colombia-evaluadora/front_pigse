@@ -49,6 +49,7 @@ const catalogNames: Partial<Record<CatalogSlug, string>> = {
   [CATALOGS.DISABILITIES]: "las discapacidades",
   [CATALOGS.LICENSE_STATUSES]: "los estados de licencia",
   [CATALOGS.ENTITY_STATUSES]: "los estados de entidad",
+  [CATALOGS.CARGOS]: "los cargos",
 }
 
 /**
@@ -95,6 +96,9 @@ const CATALOG_CATEGORIAS: Partial<Record<CatalogSlug, string>> = {
   [CATALOGS.EMPLOYEE_GRADES]: "ESCALAFON",
   // "Cargo funcional".
   [CATALOGS.FUNCTIONAL_POSITIONS]: "NOMBRE_CARGO",
+  // Cargo de PIGSE (pigse.tfuncionario.FK_TLV_CARGO) — categoría CARGO,
+  // NO NOMBRE_CARGO (esa es de CEVAL/FUNCTIONAL_POSITIONS).
+  [CATALOGS.CARGOS]: "CARGO",
 }
 
 /** Forma real de cada fila de `GET /select/:categoria` (tlista_valor). */
