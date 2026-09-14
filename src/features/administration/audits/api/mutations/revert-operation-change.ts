@@ -106,17 +106,36 @@ export function useRevertOperationChange({ mutationConfig }: UseRevertOperationC
     // `onSuccess` entero (el del caller reemplaza, no se fusiona) y el
     // `invalidateQueries` nunca correría.
     onSuccess: (data, variables, onMutateResult, context) => {
-      // Prefijo sin el `operationId`: además del detalle de cambios
-      // (`…/operations/:id/changes`) alcanza al listado de operaciones de la
-      // tabla y a sus stats, que también cambian — el revert deja una
-      // operación NUEVA registrada en la auditoría.
-      queryClient.invalidateQueries({
-        queryKey: ["audit-tables", variables.tableSlug, "operations"],
-      })
-      // El mismo revert puede dispararse desde la vista de una SESIÓN, cuyo
-      // listado vive bajo otra clave y no cuelga de `audit-tables`.
-      queryClient.invalidateQueries({ queryKey: ["audits", "sessions"] })
+      // El toast/cierre de dialog del caller va INMEDIATO — el POST /revert
+      // ya confirmó el UPDATE contra Postgres, así que desde la perspectiva
+      // del usuario la acción "ya pasó".
       mutationConfig?.onSuccess?.(data, variables, onMutateResult, context)
+
+      // Las listas de auditoría, en cambio, NO leen Postgres — leen
+      // ClickHouse, que se llena vía CDC (Postgres → Debezium → cdc-worker
+      // → ClickHouse) con latencia real, no instantánea (encontrado en
+      // vivo: `latencia_ms` de filas de reversión recientes entre ~20ms y
+      // ~660ms, con margen para picos mayores bajo carga). Invalidar de
+      // inmediato dispara el refetch ANTES de que la fila nueva exista en
+      // ClickHouse — la consulta vuelve a traer exactamente lo mismo de
+      // antes, y desde afuera se ve como "no se refrescó" hasta que alguien
+      // refresca a mano más tarde (momento en el que el pipeline ya alcanzó
+      // a propagar el cambio). No hay forma de esperar la propagación real
+      // sin un mecanismo de notificación aparte (fuera de alcance acá), así
+      // que se da un margen fijo -- suficiente para el caso común, no una
+      // garantía absoluta bajo un pipeline con mucha carga.
+      setTimeout(() => {
+        // Prefijo sin el `operationId`: además del detalle de cambios
+        // (`…/operations/:id/changes`) alcanza al listado de operaciones de
+        // la tabla y a sus stats, que también cambian — el revert deja una
+        // operación NUEVA registrada en la auditoría.
+        queryClient.invalidateQueries({
+          queryKey: ["audit-tables", variables.tableSlug, "operations"],
+        })
+        // El mismo revert puede dispararse desde la vista de una SESIÓN,
+        // cuyo listado vive bajo otra clave y no cuelga de `audit-tables`.
+        queryClient.invalidateQueries({ queryKey: ["audits", "sessions"] })
+      }, 1500)
     },
   })
 }
