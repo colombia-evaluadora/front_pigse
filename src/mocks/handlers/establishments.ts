@@ -90,7 +90,7 @@ function applyFilters(
       }
     }
 
-    if (filters.status?.length && !filters.status.includes(row.status)) {
+    if (filters.status?.length && (row.status == null || !filters.status.includes(row.status))) {
       return false
     }
 
@@ -121,8 +121,8 @@ function applySorting(
   const [{ id, desc }] = sorting
 
   const sorted = [...rows].sort((a, b) => {
-    const av = sortValue(a, id)
-    const bv = sortValue(b, id)
+    const av = sortValue(a, id) ?? ""
+    const bv = sortValue(b, id) ?? ""
 
     if (av === bv) {
       return 0

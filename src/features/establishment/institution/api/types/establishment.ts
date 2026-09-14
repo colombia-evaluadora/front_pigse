@@ -19,10 +19,12 @@ export interface Establishment {
   name: string
   department: string
   municipality: string
-  status: EstablishmentStatus
+  // `fk_tlv_estado_establecimiento` es nullable en pigse.TESTABLECIMIENTO
+  // (V387) -- un establecimiento sin estado asignado todavía manda null.
+  status: EstablishmentStatus | null
   /** Nombre para mostrar (real: `estado_nombre`; mock: `ENTITY_STATUSES.name`)
    * — `status` es el id, no es legible por sí solo. */
-  statusLabel: string
+  statusLabel: string | null
 }
 
 export interface EstablishmentDetails {
