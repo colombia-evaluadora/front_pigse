@@ -117,4 +117,11 @@ export const catalogHandlers = [
   http.get(`/api/catalogs/${CATALOGS.ENTITY_STATUSES}`, () => {
     return HttpResponse.json(ENTITY_STATUSES)
   }),
+
+  // Cargo de PIGSE (tlista_valor.CARGO) — catálogo distinto de
+  // FUNCTIONAL_POSITIONS (NOMBRE_CARGO, de CEVAL); reusa el mismo fixture
+  // porque el mock no distingue la categoría real, solo la forma del dato.
+  http.get(`/api/catalogs/${CATALOGS.CARGOS}`, () => {
+    return HttpResponse.json(FUNCTIONAL_POSITIONS)
+  }),
 ]
