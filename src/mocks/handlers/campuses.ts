@@ -43,10 +43,6 @@ const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
   excel: "Excel",
 }
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : []
-}
-
 function asIdArray(value: unknown): number[] {
   return Array.isArray(value)
     ? value.filter((item): item is number => typeof item === "number" && Number.isFinite(item))
@@ -60,7 +56,8 @@ function parseCampusesRequest(body: Partial<CampusesQueryRequest> | null): Campu
   return {
     filters: {
       search: typeof body?.filters?.search === "string" ? body.filters.search : undefined,
-      zones: asStringArray(body?.filters?.zones),
+      establishmentId:
+        typeof body?.filters?.establishmentId === "number" ? body.filters.establishmentId : undefined,
     },
     sorting: Array.isArray(body?.sorting)
       ? body.sorting
@@ -94,12 +91,6 @@ function applyFilters(rows: Campus[], filters: CampusesQueryRequest["filters"]):
       if (!matches) {
         return false
       }
-    }
-
-    // El `<Select>` del buscador manda `String(item.id)`, no el `code` (ver
-    // search-campuses.tsx).
-    if (filters.zones?.length && !filters.zones.includes(String(row.zone?.id ?? ""))) {
-      return false
     }
 
     return true

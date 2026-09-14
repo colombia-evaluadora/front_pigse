@@ -5,6 +5,7 @@ import { useNotify } from "@/components/notice/notice-context"
 
 import { useDelete } from "@/features/establishment/employees/api/mutations/use-delete"
 import type { EmployeeListItem } from "@/features/establishment/employees/api/types/employee"
+import { useMenuPermission } from "@/features/navigation/api/use-menu-permission"
 
 interface DeleteEmployeeDialogProps {
   employee: EmployeeListItem
@@ -17,6 +18,7 @@ interface DeleteEmployeeDialogProps {
  */
 export function DeleteEmployeeDialog({ employee }: DeleteEmployeeDialogProps) {
   const { notify } = useNotify()
+  const { puedeEliminar } = useMenuPermission("FUNCIONARIOS")
 
   const deleteMutation = useDelete({
     mutationConfig: {
@@ -32,6 +34,8 @@ export function DeleteEmployeeDialog({ employee }: DeleteEmployeeDialogProps) {
       },
     },
   })
+
+  if (!puedeEliminar) return null
 
   return (
     <ConfirmRemoveButton

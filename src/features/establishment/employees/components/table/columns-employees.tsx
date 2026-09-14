@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table"
 
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PencilIcon } from "@/components/ui/icons"
 import { DataTableColumnHeader } from "@/components/data-table"
@@ -13,9 +13,22 @@ import {
 } from "@/features/establishment/employees/api/ui-mappings"
 import type { EmployeeListItem } from "@/features/establishment/employees/api/types/employee"
 import { DeleteEmployeeDialog } from "@/features/establishment/employees/components/dialogs/dialog-delete"
+import { useMenuPermission } from "@/features/navigation/api/use-menu-permission"
 
 interface EmployeeColumnsOptions {
   onEdit: (employeeId: number) => void
+}
+
+// Cuántas sedes se listan por nombre antes de resumir el resto en un "+N".
+//
+// Es 1 y no 2 porque el "+N" cuenta lo que NO se renderiza, no lo que no entra:
+// con 2 los nombres de sede rara vez caben en el ancho de la columna y el
+// segundo se lo comía el `truncate`, así que se veía una sede y un "+1" cuando
+// en realidad quedaban dos escondidas.
+const VISIBLE_CAMPUSES = 1
+
+function formatCampusNames(campuses: string[]) {
+  return campuses.join(", ")
 }
 
 /**
@@ -35,7 +48,7 @@ function formatCatalogNames(items: EmployeeListItem["roles"]) {
  * rojo). Separados, cada uno lleva su color —verde activo, rojo suspendido—
  * y la mezcla se lee sola.
  */
-function renderStatusCell(statuses: EmployeeListItem["statuses"]) {
+export function renderStatusCell(statuses: EmployeeListItem["statuses"]) {
   if (statuses.length === 0) {
     return "—"
   }
@@ -47,6 +60,34 @@ function renderStatusCell(statuses: EmployeeListItem["statuses"]) {
           {EMPLOYEE_STATUS_LABELS[status]}
         </Badge>
       ))}
+    </div>
+  )
+}
+
+function ActionsCell({
+  employee,
+  onEdit,
+}: {
+  employee: EmployeeListItem
+  onEdit: (id: number) => void
+}) {
+  const { puedeEditar } = useMenuPermission("FUNCIONARIOS")
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {puedeEditar ? (
+        <Button
+          type="button"
+          variant="ghost"
+          color="neutral"
+          size="icon-sm"
+          aria-label="Editar funcionario"
+          onClick={() => onEdit(employee.id)}
+        >
+          <PencilIcon />
+        </Button>
+      ) : null}
+      <DeleteEmployeeDialog employee={employee} />
     </div>
   )
 }
@@ -91,6 +132,15 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
       cell: ({ row }) => <p className="uppercase font-bold">{row.original.name}</p>,
     },
     {
+      accessorKey: "establishmentName",
+      id: "establishmentName",
+      meta: { label: "Establecimiento" },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Establecimiento" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-foreground">{row.original.establishmentName}</span>
+      ),
+    },
+    {
       accessorKey: "role",
       id: "role",
       meta: { label: "Rol" },
@@ -106,15 +156,47 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
           <Tooltip>
             <TooltipTrigger
               render={
-                // El ancho es lo que dispara los puntos suspensivos: con el tope
-                // anterior (16rem) casi ningún rol llegaba a recortarse y el
-                // tooltip aparecía sin que nada avisara que había más texto.
-                <span className="block max-w-[12rem] truncate text-sm text-foreground uppercase" />
+                <span className="block max-w-[16rem] truncate text-sm text-foreground uppercase" />
               }
             >
               {fullText}
             </TooltipTrigger>
             <TooltipContent>{fullText}</TooltipContent>
+          </Tooltip>
+        )
+      },
+    },
+    {
+      accessorKey: "campuses",
+      id: "campuses",
+      meta: { label: "Sede educativa" },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Sede educativa" />,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const campuses = row.original.campuses
+
+        if (campuses.length === 0) {
+          return <span className="text-sm text-foreground">—</span>
+        }
+
+        const extra = campuses.length - VISIBLE_CAMPUSES
+
+        return (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                // El "+N" va fuera del `truncate` y con `shrink-0`: si compartiera
+                // el bloque que se recorta, se lo comerían los puntos suspensivos
+                // justo cuando hace falta leerlo.
+                <div className="flex max-w-[18rem] items-center gap-1 text-sm text-foreground">
+                  <span className="truncate">
+                    {formatCampusNames(campuses.slice(0, VISIBLE_CAMPUSES))}
+                  </span>
+                  {extra > 0 ? <span className="shrink-0 text-muted-foreground">+{extra}</span> : null}
+                </div>
+              }
+            />
+            <TooltipContent>{formatCampusNames(campuses)}</TooltipContent>
           </Tooltip>
         )
       },
@@ -139,8 +221,6 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
           <Tooltip>
             <TooltipTrigger
               render={
-                // Mismo tope que "Rol": con varias jornadas el texto se recorta
-                // con "…" y el tooltip trae la lista completa.
                 <span className="block max-w-[12rem] truncate text-sm text-foreground uppercase" />
               }
             >
@@ -163,21 +243,7 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
     {
       id: "actions",
       header: () => <span className="sr-only">Acciones</span>,
-      cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            color="neutral"
-            size="icon-sm"
-            aria-label="Editar funcionario"
-            onClick={() => onEdit(row.original.id)}
-          >
-            <PencilIcon />
-          </Button>
-          <DeleteEmployeeDialog employee={row.original} />
-        </div>
-      ),
+      cell: ({ row }) => <ActionsCell employee={row.original} onEdit={onEdit} />,
       enableSorting: false,
       enableHiding: false,
       size: 96,

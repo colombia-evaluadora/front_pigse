@@ -4,12 +4,7 @@ import { env } from "@/config/env"
 import { api } from "@/lib/api-client"
 import { AUDIT_API_PREFIX, apiPath } from "@/lib/api-paths"
 import { unwrapRows, type RowsEnvelope } from "@/lib/response-envelope"
-import {
-  paginateWindow,
-  sortWindow,
-  toBind,
-  toIsoDateTime,
-} from "@/features/administration/audits/api/real-mapping"
+import { sortWindow, toBind, toIsoDateTime } from "@/features/administration/audits/api/real-mapping"
 import type {
   AuditSession,
   AuditsQueryRequest,
@@ -77,11 +72,21 @@ async function fetchAudits(params: UseAuditsQueryParams): Promise<AuditsQueryRes
     pageSize: params.pageSize,
   })
 
-  const rows = unwrapRows(response)
-    .map(toAuditSession)
-    .filter((row) => !statuses?.length || statuses.includes(row.status))
+  const rawRows = unwrapRows(response)
+  // V376 (sso): el servidor ya pagina de verdad -- esto es la página real,
+  // no una ventana de 100 para recortar acá. `totalCount` (`count() OVER()`)
+  // ya es el total global, ajeno al LIMIT/OFFSET de esta página.
+  const totalCount = rawRows[0]?.totalCount ?? 0
+  const rows = sortWindow(
+    rawRows.map(toAuditSession).filter((row) => !statuses?.length || statuses.includes(row.status)),
+    params.sorting,
+  )
 
-  return paginateWindow(sortWindow(rows, params.sorting), params.pageIndex, params.pageSize)
+  return {
+    rows,
+    pageCount: Math.max(1, Math.ceil(totalCount / params.pageSize)),
+    totalCount,
+  }
 }
 
 export const auditsQueryKey = (params: UseAuditsQueryParams) => ["audits", params]
