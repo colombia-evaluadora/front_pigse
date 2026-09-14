@@ -31,7 +31,7 @@ export interface EstablishmentOption {
 
 export interface CampusesQueryFilters {
   search?: string
-  zones?: string[]
+  establishmentId?: number | null
 }
 
 export interface CampusesQueryRequest {

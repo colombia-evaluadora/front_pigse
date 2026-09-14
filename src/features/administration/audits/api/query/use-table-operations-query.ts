@@ -6,7 +6,6 @@ import { AUDIT_API_PREFIX, apiPath } from "@/lib/api-paths"
 import { unwrapRows, type RowsEnvelope } from "@/lib/response-envelope"
 import {
   matchesFieldFilters,
-  paginateWindow,
   parseRawRow,
   sortWindow,
   toBind,
@@ -95,12 +94,22 @@ async function fetchTableOperations(
   })
 
   const operations = params.filters.operations
-  const rows = unwrapRows(response)
-    .map(toTableOperation)
-    .filter((row) => !operations?.length || operations.includes(row.operation))
-    .filter((row) => matchesFieldFilters(row.entityFields, params.filters.fieldFilters))
+  const rawRows = unwrapRows(response)
+  // V376 (sso): el servidor ya pagina de verdad -- esto es la página real.
+  const totalCount = rawRows[0]?.totalCount ?? 0
+  const rows = sortWindow(
+    rawRows
+      .map(toTableOperation)
+      .filter((row) => !operations?.length || operations.includes(row.operation))
+      .filter((row) => matchesFieldFilters(row.entityFields, params.filters.fieldFilters)),
+    params.sorting,
+  )
 
-  return paginateWindow(sortWindow(rows, params.sorting), params.pageIndex, params.pageSize)
+  return {
+    rows,
+    pageCount: Math.max(1, Math.ceil(totalCount / params.pageSize)),
+    totalCount,
+  }
 }
 
 export function useTableOperationsQuery(params: UseTableOperationsQueryParams) {

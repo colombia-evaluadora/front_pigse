@@ -32,6 +32,10 @@ export function useDocumentsQuery() {
 
 export interface AllDocumentsQueryRequest {
   search: string
+  /** Código de tipo (`PEI`/`PEC`/`PMI`) — vacío = todos. */
+  type?: string
+  /** Código de estado (`COMPLETO`/`PENDIENTE`/`NO_APLICA`) — vacío = todos. */
+  status?: string
   sorting: { id: string; desc: boolean }[]
   pageIndex: number
   pageSize: number
@@ -87,7 +91,7 @@ async function fetchAllDocuments(
   }
 
   const body = {
-    filters: { search: params.search },
+    filters: { search: params.search, tipo: params.type || undefined, estado: params.status || undefined },
     sorting: toSingleSort(params.sorting),
     pageIndex: params.pageIndex,
     pageSize: params.pageSize,

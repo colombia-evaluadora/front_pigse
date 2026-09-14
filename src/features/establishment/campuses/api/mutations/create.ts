@@ -11,56 +11,55 @@ export interface CreateResult {
 }
 
 /**
- * El validador de placeholders de la plataforma recorre TODO el JSON del
- * body y exige que cada leaf tenga un tipo declarado en la query — no basta
- * con declarar `BODY.ZONE.ID`: si el objeto que se manda también trae
- * `.code`/`.name` (como `Campus["zone"]`, un `CatalogItem` completo), esos
- * dos leaves quedan sin declarar y la petición se rechaza entera (aunque
- * `.id` sí esté declarado). Por eso acá NO se manda el objeto completo:
- * `zone` sale aplanado a su `id` (`BODY.ZONE` a secas, ya no
- * `BODY.ZONE.ID` — la query se actualizó para matchear, ver id_query 89/90).
- *
- * Además:
- * - `commune` → `comune` (typo del backend, confirmado contra la query).
- * - `establishmentId` solo tiene sentido en el alta (`fn_sed_crear` lo
- *   necesita); en la actualización ni siquiera está declarado en la query
- *   (`FK_TESTABLECIMIENTO` es inmutable), así que si viaja igual el
- *   validador también lo rechaza — se saca explícitamente en `update`.
- * - `id` tampoco se manda en la actualización: el PK ya va en la URL
- *   (`PARAM.ID`), la query no tiene un `BODY.ID` declarado.
+ * Adapta el `Campus`/`CampusDraft` del front (inglés, `zone` como
+ * `CatalogItem`) al contrato de `pigse.fn_sed_crear`/`fn_sed_actualizar`
+ * (V370/V371): binds top-level en español (`codigo`, `nombre`, `fkTlvZona`,
+ * `fkEstablecimiento`, `barrio`, `comuna`, `direccion`, `telefono`) --
+ * `zone` se aplana a su `id` porque el validador de placeholders rechaza un
+ * `CatalogItem` completo donde solo se declaró un escalar.
  */
 function toRealCreatePayload(values: CampusDraft) {
-  const { commune, zone, ...rest } = values
-  return { ...rest, comune: commune, zone: zone?.id ?? null }
+  return {
+    codigo: values.dane,
+    nombre: values.name,
+    fkTlvZona: values.zone?.id ?? null,
+    fkEstablecimiento: values.establishmentId,
+    barrio: values.neighborhood || undefined,
+    comuna: values.commune || undefined,
+    direccion: values.address || undefined,
+    telefono: values.phone || undefined,
+  }
 }
 
 function toRealUpdatePayload(values: Campus) {
-  const { commune, zone, id: _id, ...rest } = values as Campus & { establishmentId?: number | null }
-  const { establishmentId: _establishmentId, ...withoutEstablishment } = rest
-  return { ...withoutEstablishment, comune: commune, zone: zone?.id ?? null }
+  return {
+    codigo: values.dane || undefined,
+    nombre: values.name || undefined,
+    fkTlvZona: values.zone?.id ?? undefined,
+    barrio: values.neighborhood || undefined,
+    comuna: values.commune || undefined,
+    direccion: values.address || undefined,
+    telefono: values.phone || undefined,
+  }
 }
 
 // El cliente no manda `id`: lo asigna el backend al crear.
 export function create(values: CampusDraft): Promise<CreateResult> {
   return api.post(
-    apiPath("/establishments/campuses", "/establecimientos/sedes"),
+    apiPath("/establishments/campuses", "/sedes"),
     env.ENABLE_API_MOCKING ? values : toRealCreatePayload(values),
   )
 }
 
 /**
- * PATCH, no PUT: el SSO real registra la actualización como
- * `PATCH /establecimientos/sedes/:ID` (`fn_sed_actualizar`). El PUT en ese
- * mismo path es la baja lógica (`fn_sed_soft_delete`), ver `delete.ts`.
+ * PUT, no PATCH: `pigse.fn_sed_actualizar` (V370) se registró como
+ * `PUT /sedes/:ID` -- el PATCH en ese mismo path es la baja lógica
+ * (`fn_sed_soft_delete`, ver `delete.ts`). Convención opuesta a como estaba
+ * documentada acá para CEVAL; PIGSE sigue PUT=actualizar/PATCH=eliminar en
+ * todo el resto del módulo (funcionarios, V257/V369).
  */
-export function updateCampus(
-  campusId: number,
-  values: Campus
-): Promise<CreateResult> {
-  const url = apiPath(
-    `/establishments/campuses/${campusId}`,
-    `/establecimientos/sedes/${campusId}`,
-  )
+export function updateCampus(campusId: number, values: Campus): Promise<CreateResult> {
+  const url = apiPath(`/establishments/campuses/${campusId}`, `/sedes/${campusId}`)
   const payload = env.ENABLE_API_MOCKING ? values : toRealUpdatePayload(values)
-  return env.ENABLE_API_MOCKING ? api.put(url, payload) : api.patch(url, payload)
+  return api.put(url, payload)
 }

@@ -45,6 +45,13 @@ interface ImageUploadFieldProps {
    * no `components/`.
    */
   existingPreview?: ReactNode
+  /**
+   * Si se provee, la vista previa de `existingPreview` muestra el mismo
+   * botón de borrado (ícono X) que un archivo recién elegido. El área
+   * sigue sirviendo de dropzone para reemplazarla — el botón solo cubre
+   * el caso de querer dejarla sin foto, sin tener que elegir una nueva.
+   */
+  onRemoveExisting?: () => void
   /** Se aplica a la caja exterior: es por acá que se le cambia el alto. */
   className?: string
 }
@@ -70,6 +77,7 @@ export function ImageUploadField({
   deleteLabel = "Eliminar imagen",
   error,
   existingPreview,
+  onRemoveExisting,
   className,
 }: ImageUploadFieldProps) {
   // La vista previa necesita una URL: se revoca al cambiar de archivo o al
@@ -172,13 +180,31 @@ export function ImageUploadField({
           // archivo recién elegido —la imagen sola, contenida, sin ícono
           // ni textos—, pero encima sigue siendo el dropzone: el mismo
           // click que antes cargaba, ahora reemplaza.
-          <FileUploadDropzone className="h-full w-full overflow-hidden rounded-lg border-solid bg-muted/20 p-2">
+          <FileUploadDropzone className="relative h-full w-full overflow-hidden rounded-lg border-solid bg-muted/20 p-2">
             {/*
                             Absoluto y con la imagen forzada a `size-full
                             object-contain`: el tamaño natural del archivo no
                             interviene, así que ni empuja la caja ni se recorta.
                         */}
             <div className="absolute inset-2 *:size-full *:object-contain">{existingPreview}</div>
+            {onRemoveExisting ? (
+              // Mismo ícono/posición que el botón de borrado de un
+              // archivo recién elegido (ver `AttachmentAction` arriba) —
+              // acá no hay `Attachment` de por medio (la vista previa no
+              // es un `Attachment`), así que se posiciona a mano en la
+              // esquina.
+              <button
+                type="button"
+                aria-label={deleteLabel}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onRemoveExisting()
+                }}
+                className="absolute top-1 right-1 z-10 flex size-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm hover:bg-background"
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            ) : null}
           </FileUploadDropzone>
         ) : (
           // El área completa dispara el selector de archivos (el propio

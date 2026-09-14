@@ -23,10 +23,7 @@ import {
   summarizeCampusBulkDelete,
 } from "@/features/establishment/campuses/api/mutations/use-bulk-delete"
 import { createColumns } from "@/features/establishment/campuses/components/table/columns-campuses"
-import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
-import type { CatalogItem } from "@/features/establishment/employees/api/types/catalog"
 import type { Campus } from "@/features/establishment/campuses/api/types/campus"
-import { CATALOGS } from "@/lib/catalogs"
 import { SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { DialogBulkDelete } from "@/features/establishment/employees/components/dialogs/dialog-bulk-delete"
 import { ClearSelectionDialog } from "@/features/establishment/employees/components/dialogs/dialog-clear-selection"
@@ -51,8 +48,6 @@ export function CampusesDataTable({ onEditCampus, title, action }: CampusesDataT
 
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useCampusesFilters()
-
-  const { data: zones = [] } = useCatalogQuery<CatalogItem>(CATALOGS.ZONES)
 
   const { data, isPending, isError, refetch } = useCampusesQuery({
     filters: queryFilters,
@@ -124,7 +119,6 @@ export function CampusesDataTable({ onEditCampus, title, action }: CampusesDataT
             applyFilters={applyFilters}
             clearAllFilters={clearAllFilters}
             activeFilterCount={activeFilterCount}
-            zones={zones}
           />
 
           <TableScreenActions>

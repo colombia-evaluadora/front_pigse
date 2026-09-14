@@ -75,36 +75,25 @@ function createEmployee(): Employee {
 
 export function createEmployeeRow(employee: Employee & { id: number }): EmployeeListItem {
   /**
-   * Roles del funcionario, agregados desde sus permisos y deduplicados por
-   * `code` preservando el orden. Si no hay permisos todavía (caso del primer
-   * Guardar del flujo de creación), la lista queda vacía y la celda muestra
-   * "—", igual que la columna de estado.
+   * Rol/jornada/estado/sede se agregan desde los permisos del borrador,
+   * deduplicados, igual que hace `toEmployeeListItem` con el `permisos`
+   * JSONB de `pigse.fn_fun_listar` (V370).
    */
   const rolesByCode = new Map<string, CatalogItem>()
+  const workSchedulesByCode = new Map<string, CatalogItem>()
+  const campusNames = new Set<string>()
+  const statuses = new Set<EmployeeListItem["statuses"][number]>()
   for (const permission of employee.permissions) {
     if (!rolesByCode.has(permission.role.code)) {
       rolesByCode.set(permission.role.code, permission.role)
     }
-  }
-  const roles: CatalogItem[] = Array.from(rolesByCode.values())
-
-  // Mismo criterio para las jornadas: un funcionario puede tener permisos en
-  // varias y la columna las muestra todas, no solo la del primer permiso.
-  const workSchedulesByCode = new Map<string, CatalogItem>()
-  for (const permission of employee.permissions) {
     if (!workSchedulesByCode.has(permission.workSchedule.code)) {
       workSchedulesByCode.set(permission.workSchedule.code, permission.workSchedule)
     }
+    if (permission.campusName) campusNames.add(permission.campusName)
+    statuses.add(permission.status)
   }
-  const workSchedules: CatalogItem[] = Array.from(workSchedulesByCode.values())
-
-  /**
-   * Estados del funcionario, agregados desde sus permisos y deduplicados
-   * preservando el orden de aparición. Si todavía no hay permisos
-   * (primer Guardar sin catálogos), la lista queda vacía y la celda
-   * muestra "—" como placeholder.
-   */
-  const statuses = Array.from(new Set(employee.permissions.map((permission) => permission.status)))
+  const roles: CatalogItem[] = Array.from(rolesByCode.values())
 
   const name = [
     employee.person.firstName,
@@ -119,9 +108,11 @@ export function createEmployeeRow(employee: Employee & { id: number }): Employee
     id: employee.id,
     documentNumber: employee.person.identification,
     name,
+    establishmentName: faker.company.name(),
     roles,
-    workSchedules,
-    statuses,
+    campuses: Array.from(campusNames),
+    workSchedules: Array.from(workSchedulesByCode.values()),
+    statuses: Array.from(statuses),
   }
 }
 

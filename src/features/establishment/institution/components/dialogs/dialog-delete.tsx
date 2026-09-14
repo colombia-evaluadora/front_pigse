@@ -6,6 +6,7 @@ import { useNotify } from "@/components/notice/notice-context"
 import { useDelete } from "@/features/establishment/institution/api/mutations/use-delete"
 import type { Establishment } from "@/features/establishment/institution/api/types/establishment"
 import { establishmentsRoute } from "@/router"
+import { useMenuPermission } from "@/features/navigation/api/use-menu-permission"
 
 interface DeleteEstablishmentDialogProps {
   establishment: Establishment
@@ -19,6 +20,7 @@ interface DeleteEstablishmentDialogProps {
 export function DeleteEstablishmentDialog({ establishment }: DeleteEstablishmentDialogProps) {
   const { notify } = useNotify()
   const navigate = establishmentsRoute.useNavigate()
+  const { puedeEliminar } = useMenuPermission("ESTABLECIMIENTO")
 
   const deleteMutation = useDelete({
     mutationConfig: {
@@ -38,6 +40,8 @@ export function DeleteEstablishmentDialog({ establishment }: DeleteEstablishment
       },
     },
   })
+
+  if (!puedeEliminar) return null
 
   return (
     <ConfirmRemoveButton

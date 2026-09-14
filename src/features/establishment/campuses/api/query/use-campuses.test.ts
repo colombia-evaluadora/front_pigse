@@ -21,7 +21,6 @@ it("returns paginated campus rows through the mock POST query handler", async ()
       pageSize: 10,
       filters: {
         search: campusesDb[0].name.slice(0, 8),
-        zones: campusesDb[0].zone ? [campusesDb[0].zone.code] : [],
       },
       sorting: [],
     }),
