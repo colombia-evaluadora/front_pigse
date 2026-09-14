@@ -23,47 +23,27 @@ export function useCampusesFilters(): CampusesFilters {
         search: (prev) => ({
           ...prev,
           search: values.search || undefined,
-          zones: values.zones.length ? values.zones : undefined,
           page: 0,
         }),
         replace: true,
       })
     },
-    [navigate]
+    [navigate],
   )
 
   const clearAllFilters = useCallback(() => {
     navigate({
-      search: (prev) => ({
-        ...prev,
-        search: undefined,
-        zones: undefined,
-        page: 0,
-      }),
+      search: (prev) => ({ ...prev, search: undefined, page: 0 }),
       replace: true,
     })
   }, [navigate])
 
-  const queryFilters = useMemo(
-    () => ({
-      search: search.search,
-      zones: search.zones,
-    }),
-    [search.search, search.zones]
-  )
+  const queryFilters = useMemo(() => ({ search: search.search }), [search.search])
 
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (search.search) count += 1
-    count += search.zones?.length ?? 0
-    return count
-  }, [search.search, search.zones])
+  const activeFilterCount = useMemo(() => (search.search ? 1 : 0), [search.search])
 
   return {
-    filters: {
-      search: search.search ?? "",
-      zones: search.zones ?? [],
-    },
+    filters: { search: search.search ?? "" },
     queryFilters,
     applyFilters,
     clearAllFilters,

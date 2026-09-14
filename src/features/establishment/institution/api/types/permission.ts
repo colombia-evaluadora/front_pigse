@@ -32,4 +32,12 @@ export interface Permission {
   workSchedule: CatalogItem
 
   status: PermissionStatus
+
+  /**
+   * Sede a la que aplica este permiso (`pigse.TSEDE_USUARIO.FK_TSEDE`, V370)
+   * -- PIGSE, a diferencia de CEVAL, no tenía sedes hasta V370; se agrega
+   * opcional para no romper el resto de este tipo compartido.
+   */
+  campusId?: number
+  campusName?: string
 }

@@ -19,6 +19,10 @@ import { hasAnyRole, PIGSE_ROLES } from "@/lib/auth-mapper"
 
 import { useDocumentsQuery, useAllDocumentsQuery } from "@/features/document-management/api/query/use-documents"
 import { columns as ownColumns, allInstitutionsColumns } from "@/features/document-management/components/table/columns-documents"
+import {
+  SearchDocuments,
+  type DocumentsFilters,
+} from "@/features/document-management/components/search/search-documents"
 
 /** Roles de fiscalización (V368): ven el estado documental de TODAS las
  * instituciones, no solo la propia — mismo criterio que ya tienen para
@@ -104,21 +108,33 @@ function OwnEstablishmentDocumentsTable() {
  * fiscalización, de solo lectura: no ofrece subir/eliminar por otra
  * institución.
  */
+const EMPTY_DOCUMENTS_FILTERS: DocumentsFilters = { search: "", type: [], status: [] }
+
 function AllInstitutionsDocumentsTable() {
   const { pageIndex, pageSize, goToPage, setPageSize, sorting, setSorting } = useTablePagination()
-  const [search, setSearch] = useState("")
+  const [filters, setFilters] = useState<DocumentsFilters>(EMPTY_DOCUMENTS_FILTERS)
+
+  const activeFilterCount =
+    (filters.search ? 1 : 0) + (filters.type.length ? 1 : 0) + (filters.status.length ? 1 : 0)
 
   const { data, isPending, isError, refetch } = useAllDocumentsQuery(
-    { search, sorting, pageIndex, pageSize },
+    {
+      search: filters.search,
+      type: filters.type[0],
+      status: filters.status[0],
+      sorting,
+      pageIndex,
+      pageSize,
+    },
     true,
   )
 
-  // Buscar reinicia a la primera pagina -- la que estaba puede no existir
-  // mas del lado del servidor con el nuevo filtro.
+  // Cambiar cualquier filtro reinicia a la primera pagina -- la que estaba
+  // puede no existir mas del lado del servidor con el nuevo filtro.
   useEffect(() => {
     goToPage(0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
+  }, [filters])
 
   const rows = data?.rows ?? []
 
@@ -144,12 +160,11 @@ function AllInstitutionsDocumentsTable() {
           Gestión documental
         </TableScreenTitle>
         <TableScreenToolbar>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar institución..."
-            className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm"
+          <SearchDocuments
+            filters={filters}
+            applyFilters={setFilters}
+            clearAllFilters={() => setFilters(EMPTY_DOCUMENTS_FILTERS)}
+            activeFilterCount={activeFilterCount}
           />
         </TableScreenToolbar>
       </TableScreenHeader>
