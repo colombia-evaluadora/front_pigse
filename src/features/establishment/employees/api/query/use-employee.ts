@@ -5,15 +5,26 @@ import { unwrapRow } from "@/lib/response-envelope"
 import { env } from "@/config/env"
 
 import type { Employee } from "@/features/establishment/employees/api/types/employee"
+import type { CatalogItem } from "@/types/catalog"
+
+/** Solo el `id` -- sin nombre de catálogo en esta fila (a diferencia de los
+ * `select` genéricos). El diálogo resuelve el nombre real cruzando contra la
+ * lista del catálogo (`EmployeeAdditionalInfoForm`/`pickOption`). */
+function toCatalogIdOnly(id: number | null): CatalogItem | null {
+  return id === null ? null : { id, code: String(id), name: "" }
+}
 
 interface EmployeeQueryResult {
   status: "ok"
   employee: Employee
 }
 
-/** Fila cruda de `pigse.fn_fun_buscar_por_pk` (V257) — sin jornada, estado
- * ni "información complementaria" (esos campos son de CEVAL, ver
- * V365/V366): solo lo que `pigse.TFUNCIONARIO`/`TUSUARIO` realmente tienen. */
+/** Fila cruda de `pigse.fn_fun_buscar_por_pk` (V390 en adelante incluye
+ * "información complementaria" -- mismos 8 campos que CEVAL, ver
+ * `form-employee-additional-info.tsx`). `fk_establecimiento`/`fk_tlv_cargo`
+ * siguen viniendo (el establecimiento se deriva de la sede, ver
+ * `fn_fun_permisos_actualizar`, y el cargo ya no se pide a mano -- lo cubre
+ * el rol) pero ya no se exponen en `Employee`: no hay UI que los muestre. */
 interface RealEmployeeDetailRow {
   pk_funcionario: number
   pk_usuario: number
@@ -25,9 +36,14 @@ interface RealEmployeeDetailRow {
   segundo_apellido: string | null
   correo_electronico: string
   telefono: string | null
-  fk_establecimiento: number | null
-  establecimiento_nombre: string | null
-  fk_tlv_cargo: number | null
+  fk_tlv_clase_funcionario: number | null
+  fk_tlv_nivel_ensenanza: number | null
+  fk_tlv_grado_escalafon: number | null
+  fk_tlv_nivel_educativo: number | null
+  fk_tlv_fuente_recurso: number | null
+  fk_tlv_tipo_vinculacion: number | null
+  fk_tlv_cargo_funcional: number | null
+  direccion: string | null
   permisos: {
     id: number
     orden: number
@@ -68,14 +84,14 @@ function toEmployee(row: RealEmployeeDetailRow): Employee {
       phone: row.telefono ?? "",
       password: "",
     },
-    employeeClass: null,
-    educationLevel: null,
-    grade: null,
-    highestEducationLevel: null,
-    fundingSource: null,
-    functionalPosition: null,
-    employmentType: null,
-    address: "",
+    employeeClass: toCatalogIdOnly(row.fk_tlv_clase_funcionario),
+    educationLevel: toCatalogIdOnly(row.fk_tlv_nivel_ensenanza),
+    grade: toCatalogIdOnly(row.fk_tlv_grado_escalafon),
+    highestEducationLevel: toCatalogIdOnly(row.fk_tlv_nivel_educativo),
+    fundingSource: toCatalogIdOnly(row.fk_tlv_fuente_recurso),
+    functionalPosition: toCatalogIdOnly(row.fk_tlv_cargo_funcional),
+    employmentType: toCatalogIdOnly(row.fk_tlv_tipo_vinculacion),
+    address: row.direccion ?? "",
     // PIGSE ya tiene sedes + permisos rol+jornada+estado (V370) -- espejo de
     // CEVAL. `id` es el PK_TSEDE_USUARIO real, necesario para poder borrar
     // el permiso después (ver `dialog-manage.tsx`/`update-permissions.ts`).
@@ -89,18 +105,6 @@ function toEmployee(row: RealEmployeeDetailRow): Employee {
       campusName: permiso.sede,
     })),
     status: "ACTIVE",
-    establishment:
-      row.fk_establecimiento === null
-        ? null
-        : {
-            id: row.fk_establecimiento,
-            code: String(row.fk_establecimiento),
-            name: row.establecimiento_nombre ?? "",
-          },
-    cargo:
-      row.fk_tlv_cargo === null
-        ? null
-        : { id: row.fk_tlv_cargo, code: String(row.fk_tlv_cargo), name: "" },
   }
 }
 
