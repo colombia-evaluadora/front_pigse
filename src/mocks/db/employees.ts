@@ -75,16 +75,23 @@ function createEmployee(): Employee {
 
 export function createEmployeeRow(employee: Employee & { id: number }): EmployeeListItem {
   /**
-   * PIGSE no tiene "permisos" con jornada/estado: el rol se toma directo de
-   * los permisos del borrador (el mock sigue reusando `Employee`/`permissions`
-   * porque el diálogo de alta/edición aún no se adaptó al modelo real de
-   * PIGSE — ver `dialog-manage.tsx`), deduplicado por `code`.
+   * Rol/jornada/estado/sede se agregan desde los permisos del borrador,
+   * deduplicados, igual que hace `toEmployeeListItem` con el `permisos`
+   * JSONB de `pigse.fn_fun_listar` (V370).
    */
   const rolesByCode = new Map<string, CatalogItem>()
+  const workSchedulesByCode = new Map<string, CatalogItem>()
+  const campusNames = new Set<string>()
+  const statuses = new Set<EmployeeListItem["statuses"][number]>()
   for (const permission of employee.permissions) {
     if (!rolesByCode.has(permission.role.code)) {
       rolesByCode.set(permission.role.code, permission.role)
     }
+    if (!workSchedulesByCode.has(permission.workSchedule.code)) {
+      workSchedulesByCode.set(permission.workSchedule.code, permission.workSchedule)
+    }
+    if (permission.campusName) campusNames.add(permission.campusName)
+    statuses.add(permission.status)
   }
   const roles: CatalogItem[] = Array.from(rolesByCode.values())
 
@@ -103,6 +110,9 @@ export function createEmployeeRow(employee: Employee & { id: number }): Employee
     name,
     establishmentName: faker.company.name(),
     roles,
+    campuses: Array.from(campusNames),
+    workSchedules: Array.from(workSchedulesByCode.values()),
+    statuses: Array.from(statuses),
   }
 }
 

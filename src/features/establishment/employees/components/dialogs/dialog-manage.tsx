@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { z } from "zod"
 
 import { Badge } from "@/components/ui/badge"
@@ -39,6 +40,7 @@ import { CATALOGS } from "@/lib/catalogs"
 import { toSelectItemsMap, toSelectOptions } from "@/lib/catalog-options"
 import { SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { getErrorMessage } from "@/lib/api-client"
+import { optionalImageFile } from "@/lib/image-file"
 import { env } from "@/config/env"
 
 import { useCreate } from "@/features/establishment/employees/api/mutations/use-create"
@@ -65,7 +67,10 @@ import {
   type PermissionStatus,
 } from "@/features/establishment/institution/api/types/permission"
 import { passwordRules } from "@/features/auth/api/schema"
-import { UserDetailsForm } from "@/features/establishment/employees/components/forms/form-sections/user-details-section"
+import {
+  PASSWORD_PLACEHOLDER,
+  UserDetailsForm,
+} from "@/features/establishment/employees/components/forms/form-sections/user-details-section"
 import { NoticeOutlet, useNotify } from "@/components/notice/notice-context"
 
 interface ManageEmployeeDialogProps {
@@ -208,12 +213,23 @@ const employeePersonSchema = z
 function computePersonErrors(
   person: Person | null,
   confirmPassword: string,
+  // La foto es estado aparte (viaja como binario del multipart, no como JSON),
+  // pero se valida en el mismo paso: es el último punto antes de armar el
+  // envío, y sin esto un archivo fuera de regla llegaba entero al gateway.
+  photo?: File | null,
 ): Record<string, string> {
-  if (!person) {
-    return {}
+  const nextErrors: Record<string, string> = {}
+
+  const parsedPhoto = optionalImageFile.safeParse(photo)
+  if (!parsedPhoto.success) {
+    nextErrors[`${EMPLOYEE_FIELD_PREFIX}.photo`] =
+      parsedPhoto.error.issues[0]?.message ?? "Archivo no válido."
   }
 
-  const nextErrors: Record<string, string> = {}
+  if (!person) {
+    return nextErrors
+  }
+
   const parsed = employeePersonSchema.safeParse({ person, confirmPassword })
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
@@ -245,6 +261,28 @@ function createEmptyEmployeeShell(): Omit<Employee, "person"> {
 
 function createPermissionDraft(nextOrder = 1): PermissionDraft {
   return { order: String(nextOrder), roleId: null, campusId: null, workScheduleId: null, status: "" }
+}
+
+/**
+ * Huella serializable de TODO lo editable del diálogo principal, para poder
+ * responder "¿hay algo sin guardar?" sin espejar cada campo en un estado
+ * aparte. `password`/`accountExists` quedan fuera a propósito: al cargar un
+ * funcionario existente la contraseña es el valor decorativo
+ * `PASSWORD_PLACEHOLDER`, no un dato del backend, y compararla marcaría
+ * cambios donde no los hay.
+ *
+ * A diferencia de CEVAL acá entran `establishment` y `cargo` (columnas
+ * reales de `pigse.TFUNCIONARIO`) y NO existe "información complementaria"
+ * — PIGSE no tiene esos campos.
+ */
+function buildDraftSnapshot(
+  person: Person,
+  establishment: CatalogItem | null,
+  cargo: CatalogItem | null,
+  permissions: Permission[],
+): string {
+  const { password: _password, accountExists: _accountExists, ...personRest } = person
+  return JSON.stringify({ person: personRest, establishment, cargo, permissions })
 }
 
 const permissionDraftSchema = z.object({
@@ -306,6 +344,7 @@ export function ManageEmployeeDialog({
   employeeId,
 }: ManageEmployeeDialogProps) {
   const { notify } = useNotify()
+  const queryClient = useQueryClient()
   const isEditMode = Boolean(employeeId)
   const [createdEmployeeId, setCreatedEmployeeId] = useState<number | null>(null)
 
@@ -327,6 +366,14 @@ export function ManageEmployeeDialog({
   const [permissionsSaved, setPermissionsSaved] = useState(false)
   const [isSavingPermissions, setIsSavingPermissions] = useState(false)
   const [originalPermissionIds, setOriginalPermissionIds] = useState<Set<number>>(new Set())
+
+  // Huella de lo último "limpio" (recién cargado o recién guardado). `null`
+  // mientras se está dando de alta: en alta siempre hay algo por guardar.
+  const cleanSnapshotRef = useRef<string | null>(null)
+  // Huella de los permisos tal como quedaron persistidos: es contra esto que
+  // se decide si el sub-diálogo tiene cambios reales y qué restaurar al
+  // cancelarlo.
+  const permissionsSnapshotRef = useRef<string>(JSON.stringify([]))
 
   const activeEmployeeId = isEditMode ? (employeeId ?? null) : createdEmployeeId
   const canOpenPermissions = Boolean(activeEmployeeId)
@@ -364,14 +411,26 @@ export function ManageEmployeeDialog({
 
   useEffect(() => {
     if (Object.keys(personErrors).length === 0) return
-    setPersonErrors(computePersonErrors(person, confirmPassword))
+    setPersonErrors(computePersonErrors(person, confirmPassword, photo))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `personErrors` es guard, no dep.
-  }, [person, confirmPassword])
+  }, [person, confirmPassword, photo])
 
   function applyLoadedEmployee(employee: Employee) {
-    setPerson(employee.person)
-    setEstablishment(employee.establishment ?? null)
-    setCargo(employee.cargo ?? null)
+    // El backend nunca devuelve la contraseña (`use-employee.ts` la manda
+    // como ""): al editar, el campo se muestra con el valor decorativo y
+    // bloqueado (`accountExists`) — así no se cambia por accidente la
+    // contraseña de una cuenta existente con solo abrir el diálogo.
+    const loadedPerson: Person = {
+      ...employee.person,
+      accountExists: true,
+      password: PASSWORD_PLACEHOLDER,
+    }
+    const loadedEstablishment = employee.establishment ?? null
+    const loadedCargo = employee.cargo ?? null
+
+    setPerson(loadedPerson)
+    setEstablishment(loadedEstablishment)
+    setCargo(loadedCargo)
     setPermissions(employee.permissions)
     setOriginalPermissionIds(
       new Set(employee.permissions.map((p) => p.id).filter((id): id is number => id !== undefined)),
@@ -380,9 +439,16 @@ export function ManageEmployeeDialog({
     setPersonErrors({})
     setFieldErrors({})
     setPermissionErrors({})
-    setConfirmPassword(employee.person.password)
+    setConfirmPassword(PASSWORD_PLACEHOLDER)
     setPhoto(null)
     setPermissionsSaved(employee.permissions.length > 0)
+    cleanSnapshotRef.current = buildDraftSnapshot(
+      loadedPerson,
+      loadedEstablishment,
+      loadedCargo,
+      employee.permissions,
+    )
+    permissionsSnapshotRef.current = JSON.stringify(employee.permissions)
   }
 
   useEffect(() => {
@@ -405,6 +471,8 @@ export function ManageEmployeeDialog({
       setCreatedEmployeeId(null)
       setMatchedFuncionarioId(null)
       setPermissionsSaved(false)
+      cleanSnapshotRef.current = null
+      permissionsSnapshotRef.current = JSON.stringify([])
       return
     }
 
@@ -463,6 +531,14 @@ export function ManageEmployeeDialog({
   const isSavingMain =
     createPersonMutation.isPending || createMutation.isPending || updateMutation.isPending
 
+  const hasUnsavedChanges =
+    cleanSnapshotRef.current === null ||
+    photo !== null ||
+    (person !== null &&
+      buildDraftSnapshot(person, establishment, cargo, permissions) !== cleanSnapshotRef.current)
+
+  const hasPermissionsChanges = JSON.stringify(permissions) !== permissionsSnapshotRef.current
+
   async function handleMainSave() {
     const draft = person as Person | null
 
@@ -471,7 +547,7 @@ export function ManageEmployeeDialog({
       return
     }
 
-    const nextPersonErrors = computePersonErrors(draft, confirmPassword)
+    const nextPersonErrors = computePersonErrors(draft, confirmPassword, photo)
     const nextFieldErrors: { establishment?: string } = {}
     if (!establishment) {
       nextFieldErrors.establishment = "Selecciona el establecimiento."
@@ -511,6 +587,15 @@ export function ManageEmployeeDialog({
           return
         }
         setCreatedEmployeeId(result.employee.id ?? null)
+        // El diálogo queda abierto para asignar permisos: lo recién
+        // persistido pasa a ser la huella "limpia" y Guardar se esconde
+        // hasta que se vuelva a tocar algo.
+        cleanSnapshotRef.current = buildDraftSnapshot(
+          payload.person,
+          establishment,
+          cargo,
+          permissions,
+        )
         notify(
           permissions.length === 0
             ? "Usuario guardado. Puedes asignar permisos."
@@ -563,6 +648,7 @@ export function ManageEmployeeDialog({
       })
 
       setCreatedEmployeeId(funcionarioId)
+      cleanSnapshotRef.current = buildDraftSnapshot(draft, establishment, cargo, permissions)
 
       if (!activeEmployeeId) {
         notify(
@@ -607,6 +693,27 @@ export function ManageEmployeeDialog({
       return
     }
 
+    // `fn_fun_permisos_actualizar` no tiene "editar": dos permisos con el
+    // mismo rol+sede+jornada serían dos filas indistinguibles en
+    // TSEDE_USUARIO, y dos con el mismo rol+sede+orden dejan el ORDEN
+    // ambiguo. Se rechazan acá, antes de entrar al borrador.
+    const sameRoleAndCampus = permissions.filter(
+      (permission) => permission.role.id === role.id && permission.campusId === campus.id,
+    )
+    if (sameRoleAndCampus.some((permission) => permission.workSchedule.id === workSchedule.id)) {
+      notify(
+        `Ya existe un permiso de ${role.name} en ${campus.name} con la jornada ${workSchedule.name}.`,
+        { variant: "error" },
+      )
+      return
+    }
+    if (sameRoleAndCampus.some((permission) => permission.order === Number(draft.order))) {
+      notify(`Ya existe un permiso de ${role.name} en ${campus.name} con el orden ${draft.order}.`, {
+        variant: "error",
+      })
+      return
+    }
+
     const nextPermission: Permission = {
       order: Number(draft.order),
       role,
@@ -624,13 +731,16 @@ export function ManageEmployeeDialog({
   function removePermission(order: number) {
     const removed = permissions.find((permission) => permission.order === order)
 
-    setPermissions((current) =>
-      current
-        .filter((permission) => permission.order !== order)
-        .map((permission, index) => ({ ...permission, order: index + 1 })),
-    )
+    // Solo se filtra: renumerar el resto cambiaría el ORDEN persistido de
+    // permisos que nadie tocó, y `fn_fun_permisos_actualizar` no tiene
+    // "editar" para sincronizar ese cambio (solo crear/eliminar).
+    setPermissions((current) => current.filter((permission) => permission.order !== order))
 
-    notify(removed ? `Permiso de ${removed.role.name} eliminado.` : "Permiso eliminado.")
+    notify(
+      removed
+        ? `Permiso de ${removed.role.name} en ${removed.campusName} eliminado.`
+        : "Permiso eliminado.",
+    )
   }
 
   /**
@@ -643,6 +753,7 @@ export function ManageEmployeeDialog({
     if (env.ENABLE_API_MOCKING || !activeEmployeeId) {
       setPermissionsSaved(true)
       setPermissionsDialogOpen(false)
+      permissionsSnapshotRef.current = JSON.stringify(permissions)
       notify("Permisos agregados al borrador. Pulsa Guardar para persistir el funcionario.", {
         variant: "info",
       })
@@ -658,6 +769,10 @@ export function ManageEmployeeDialog({
     if (toDelete.length === 0 && toCreate.length === 0) {
       setPermissionsSaved(true)
       setPermissionsDialogOpen(false)
+      permissionsSnapshotRef.current = JSON.stringify(permissions)
+      if (person) {
+        cleanSnapshotRef.current = buildDraftSnapshot(person, establishment, cargo, permissions)
+      }
       return
     }
 
@@ -671,15 +786,21 @@ export function ManageEmployeeDialog({
 
       const createdIds = results.filter((row) => row.accion === "crear").map((row) => row.id)
       let createdIndex = 0
-      setPermissions((current) =>
-        current.map((permission) => {
-          if (permission.id !== undefined) return permission
-          const id = createdIds[createdIndex]
-          createdIndex += 1
-          return id === undefined ? permission : { ...permission, id }
-        }),
-      )
+      const nextPermissions = permissions.map((permission) => {
+        if (permission.id !== undefined) return permission
+        const id = createdIds[createdIndex]
+        createdIndex += 1
+        return id === undefined ? permission : { ...permission, id }
+      })
+      setPermissions(nextPermissions)
       setOriginalPermissionIds(new Set([...currentIds, ...createdIds]))
+      permissionsSnapshotRef.current = JSON.stringify(nextPermissions)
+      if (person) {
+        cleanSnapshotRef.current = buildDraftSnapshot(person, establishment, cargo, nextPermissions)
+      }
+      // El listado de funcionarios muestra sede/jornada/estado derivados de
+      // estos permisos: sin invalidar, la tabla de atrás queda vieja.
+      void queryClient.invalidateQueries({ queryKey: ["employees"] })
 
       setPermissionsSaved(true)
       setPermissionsDialogOpen(false)
@@ -691,6 +812,21 @@ export function ManageEmployeeDialog({
     } finally {
       setIsSavingPermissions(false)
     }
+  }
+
+  /**
+   * Cerrar el sub-diálogo sin guardar descarta el borrador: se restauran los
+   * permisos tal como estaban persistidos (`permissionsSnapshotRef`) en vez
+   * de dejar altas/bajas sueltas en el estado del diálogo principal.
+   */
+  function handlePermissionsDialogOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      const savedPermissions: Permission[] = JSON.parse(permissionsSnapshotRef.current)
+      setPermissions(savedPermissions)
+      setPermissionDraft(createPermissionDraft(savedPermissions.length + 1))
+      setPermissionErrors({})
+    }
+    setPermissionsDialogOpen(nextOpen)
   }
 
   const mainTitle = isEditMode ? "Editar usuario" : "Agregar usuario"
@@ -719,6 +855,14 @@ export function ManageEmployeeDialog({
             onConfirmPasswordChange={setConfirmPassword}
             photo={photo}
             onPhotoChange={setPhoto}
+            // Borrar la foto YA guardada: el form limpia
+            // `person.photoArchivoId` (la vista previa desaparece y el
+            // mock deja de persistirla) y acá se descarta cualquier
+            // archivo que hubiera quedado en cola. En backend real el
+            // borrado todavía no se puede persistir:
+            // `PUT /funcionarios/:ID` (`pigse.fn_fun_actualizar`,
+            // V257/V369) no declara ningún bind de foto — ver `update.ts`.
+            onRemovePhoto={() => setPhoto(null)}
             onMatched={(found) => {
               setMatchedFuncionarioId(found?.id ?? null)
             }}
@@ -799,16 +943,18 @@ export function ManageEmployeeDialog({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="fill"
-                color="primary"
-                size="sm"
-                onClick={() => void handleMainSave()}
-                disabled={isSavingMain}
-              >
-                <CheckIcon data-icon="inline-start" />
-                {isSavingMain ? "Guardando..." : "Guardar"}
-              </Button>
+              {hasUnsavedChanges && !permissionsDialogOpen && (
+                <Button
+                  variant="fill"
+                  color="primary"
+                  size="sm"
+                  onClick={() => void handleMainSave()}
+                  disabled={isSavingMain}
+                >
+                  <CheckIcon data-icon="inline-start" />
+                  {isSavingMain ? "Guardando..." : "Guardar"}
+                </Button>
+              )}
               <Button
                 variant="fill"
                 color="neutral"
@@ -824,7 +970,7 @@ export function ManageEmployeeDialog({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
+      <Dialog open={permissionsDialogOpen} onOpenChange={handlePermissionsDialogOpenChange}>
         <DialogContent
           className="w-[min(95vw,56rem)] max-w-none sm:max-w-224 max-h-[85vh] overflow-y-auto overflow-x-hidden"
           showCloseButton={false}
@@ -1001,6 +1147,7 @@ export function ManageEmployeeDialog({
                 variant="fill"
                 color="primary"
                 onClick={addPermission}
+                disabled={!permissionDraftSchema.safeParse(permissionDraft).success}
                 className="w-full sm:w-auto"
               >
                 <ControlPointIcon data-icon="inline-start" />
@@ -1064,7 +1211,10 @@ export function ManageEmployeeDialog({
               </TableHeader>
               <TableBody>
                 {sortedPermissions.map((permission) => (
-                  <TableRow key={permission.order} className="group/row">
+                  <TableRow
+                    key={`${permission.order}-${permission.campusId}`}
+                    className="group/row"
+                  >
                     <TableCell className="font-medium">{permission.order}</TableCell>
                     <TableCell>{permission.campusName}</TableCell>
                     <TableCell>{permission.role.name}</TableCell>
@@ -1096,7 +1246,7 @@ export function ManageEmployeeDialog({
           )}
 
           <DialogFooter className="justify-end sm:justify-end">
-            {permissions.length > 0 && (
+            {hasPermissionsChanges && (
               <Button
                 variant="fill"
                 color="primary"
@@ -1112,7 +1262,7 @@ export function ManageEmployeeDialog({
               variant="fill"
               color="neutral"
               size="sm"
-              onClick={() => setPermissionsDialogOpen(false)}
+              onClick={() => handlePermissionsDialogOpenChange(false)}
               disabled={isSavingPermissions}
             >
               <XIcon data-icon="inline-start" />

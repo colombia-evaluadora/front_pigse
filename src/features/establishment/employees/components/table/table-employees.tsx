@@ -31,6 +31,7 @@ import { ExportEmployeesDialog } from "@/features/establishment/employees/compon
 import { ExportSelectedEmployeesDialog } from "@/features/establishment/employees/components/dialogs/dialog-export-selected"
 import { SearchEmployees } from "@/features/establishment/employees/components/search/search-employees"
 import { useNotify } from "@/components/notice/notice-context"
+import { useMenuPermission } from "@/features/navigation/api/use-menu-permission"
 
 interface EmployeesDataTableProps {
   onEditEmployee: (employeeId: number) => void
@@ -42,6 +43,7 @@ interface EmployeesDataTableProps {
 
 export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesDataTableProps) {
   const { notify } = useNotify()
+  const { puedeEliminar } = useMenuPermission("FUNCIONARIOS")
   const { pageIndex, pageSize, goToPage, setPageSize, sorting, setSorting } = useTablePagination()
 
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
@@ -121,21 +123,23 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
             {hasSelection ? (
               <>
                 <ClearSelectionDialog resetSelection={resetSelection} />
-                <DialogBulkDelete<EmployeeListItem, number>
-                  items={selectedItems}
-                  getItemId={(item) => item.id}
-                  getItemLabel={(item) => item.name}
-                  title="Eliminar"
-                  buildDescription={(count, sample) => {
-                    const list = sample.join(", ")
-                    const suffix = count > sample.length ? ` y ${count - sample.length} más` : ""
-                    return `Se eliminarán permanentemente los funcionarios ${list}${suffix} (${count} en total). Esta acción no se puede deshacer.`
-                  }}
-                  onConfirm={async (ids) => {
-                    await bulkDelete.mutateAsync(ids)
-                  }}
-                  triggerLabel={`Eliminar (${selectedIds.length})`}
-                />
+                {puedeEliminar ? (
+                  <DialogBulkDelete<EmployeeListItem, number>
+                    items={selectedItems}
+                    getItemId={(item) => item.id}
+                    getItemLabel={(item) => item.name}
+                    title="Eliminar"
+                    buildDescription={(count, sample) => {
+                      const list = sample.join(", ")
+                      const suffix = count > sample.length ? ` y ${count - sample.length} más` : ""
+                      return `Se eliminarán permanentemente los funcionarios ${list}${suffix} (${count} en total). Esta acción no se puede deshacer.`
+                    }}
+                    onConfirm={async (ids) => {
+                      await bulkDelete.mutateAsync(ids)
+                    }}
+                    triggerLabel={`Eliminar (${selectedIds.length})`}
+                  />
+                ) : null}
                 <ExportSelectedEmployeesDialog
                   selectedIds={selectedItems.map((item) => item.id)}
                   resetSelection={resetSelection}
