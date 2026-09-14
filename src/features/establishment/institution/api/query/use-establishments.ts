@@ -49,8 +49,10 @@ interface RealEstablishmentRow {
   departamento_nombre: string
   fk_municipio: number
   municipio_nombre: string
-  fk_estado: number
-  estado_nombre: string
+  // `fk_tlv_estado_establecimiento` es nullable en pigse.TESTABLECIMIENTO
+  // (V387) -- un establecimiento sin estado asignado todavía manda null.
+  fk_estado: number | null
+  estado_nombre: string | null
 }
 
 function toEstablishment(row: RealEstablishmentRow): Establishment {
@@ -60,7 +62,7 @@ function toEstablishment(row: RealEstablishmentRow): Establishment {
     name: row.nombre,
     department: row.departamento_nombre,
     municipality: row.municipio_nombre,
-    status: String(row.fk_estado),
+    status: row.fk_estado == null ? null : String(row.fk_estado),
     statusLabel: row.estado_nombre,
   }
 }

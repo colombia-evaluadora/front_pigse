@@ -13,12 +13,33 @@ import type {
 } from "@/features/establishment/campuses/api/types/campus"
 
 /**
- * `pigse.fn_sed_listar` (V370/V371) solo declara `BODY.FILTERS.SEARCH` y
- * `BODY.FILTERS.ESTABLECIMIENTO` -- sin filtro por zona (a diferencia de
- * CEVAL). Mandar `zones` dispara el 400 de "placeholders sin tipo
- * declarado" (mismo bug que `/funcionarios/query`).
+ * Desde V386 `pigse.fn_sed_listar` declara, además de `BODY.FILTERS.SEARCH` y
+ * `BODY.FILTERS.ESTABLECIMIENTO`, el bind `BODY.FILTERS.ZONA` (`VARCHAR[]`),
+ * que compara contra el NOMBRE de la zona (`TLISTA_VALOR.NOMBRE`), no contra
+ * el id. La clave es la del `param_types` del query-service —singular y en
+ * español—, no la del estado de la UI: mandar `zones` devolvería 400 por
+ * "placeholders sin tipo declarado".
+ *
+ * Mismo formato de arreglo real (no cadena separada por comas) que el resto
+ * de los filtros del listado.
  */
 export function toCampusesQueryFilters(filters: CampusesQueryRequest["filters"]) {
+  return {
+    search: filters.search ?? "",
+    establecimiento: filters.establishmentId ?? undefined,
+    zona: filters.zones ?? [],
+  }
+}
+
+/**
+ * Los filtros que acepta el REPORTE de sedes.
+ *
+ * Más angosto que el del listado por la misma razón que en funcionarios: V386
+ * agregó `BODY.FILTERS.ZONA` a la fila `/sedes/query`, pero la fila de reporte
+ * del `reporting-service` quedó con su juego de tipos viejo y rechazaría la
+ * clave nueva con 400.
+ */
+export function toCampusesReportFilters(filters: CampusesQueryRequest["filters"]) {
   return {
     search: filters.search ?? "",
     establecimiento: filters.establishmentId ?? undefined,
