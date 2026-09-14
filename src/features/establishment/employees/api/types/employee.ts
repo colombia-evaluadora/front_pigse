@@ -46,12 +46,22 @@ export interface EmployeeListItem {
   name: string
   establishmentName: string
   /**
-   * Roles del funcionario en su establecimiento (`pigse.TESTABLECIMIENTO_USUARIO`
-   * vía `pigse.fn_fun_listar`) — a diferencia de CEVAL, PIGSE no tiene
-   * concepto de "jornada" ni "estado" por permiso: un funcionario simplemente
-   * tiene uno o más roles asignados en su establecimiento.
+   * Roles agregados a partir de los permisos del funcionario
+   * (`pigse.fn_fun_listar`, V370, devuelve `permisos` como JSONB con
+   * rol+sede+jornada+estado por fila). Se listan una sola vez por `idRole`,
+   * conservando el orden de aparición.
    */
   roles: CatalogItem[]
+  /** Nombres de sede (`permisos[].sede`), sin duplicados. */
+  campuses: string[]
+  /**
+   * Jornadas agregadas desde los permisos, igual que `roles`: un funcionario
+   * puede tener permisos en más de una jornada (mañana y tarde, por ejemplo),
+   * así que la celda las lista separadas por comas.
+   */
+  workSchedules: CatalogItem[]
+  /** Estados agregados desde los permisos, sin duplicados. */
+  statuses: EmployeeStatus[]
 }
 
 export interface EmployeesQueryFilters {
