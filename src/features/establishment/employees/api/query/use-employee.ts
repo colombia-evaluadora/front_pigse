@@ -28,7 +28,17 @@ interface RealEmployeeDetailRow {
   fk_establecimiento: number | null
   establecimiento_nombre: string | null
   fk_tlv_cargo: number | null
-  roles: { idRole: number; nombre: string }[]
+  permisos: {
+    id: number
+    orden: number
+    idRole: number
+    nombre: string
+    idSede: number
+    sede: string
+    idJornada: number
+    jornada: string
+    estado: "ACTIVO" | "INACTIVO"
+  }[]
 }
 
 function toEmployee(row: RealEmployeeDetailRow): Employee {
@@ -66,16 +76,17 @@ function toEmployee(row: RealEmployeeDetailRow): Employee {
     functionalPosition: null,
     employmentType: null,
     address: "",
-    // PIGSE no tiene "permisos" con jornada/estado (ver V365/V366) — se
-    // reusa la forma de `Permission` solo para transportar el rol actual
-    // hasta `dialog-manage.tsx` (que lee `permissions[0]?.role.id` como el
-    // rol preseleccionado), con `workSchedule`/`status` en blanco porque no
-    // aplican y nunca se leen para PIGSE.
-    permissions: (row.roles ?? []).map((role, index) => ({
-      order: index + 1,
-      role: { id: role.idRole, code: "", name: role.nombre },
-      workSchedule: { id: 0, code: "", name: "" },
-      status: "ACTIVE" as const,
+    // PIGSE ya tiene sedes + permisos rol+jornada+estado (V370) -- espejo de
+    // CEVAL. `id` es el PK_TSEDE_USUARIO real, necesario para poder borrar
+    // el permiso después (ver `dialog-manage.tsx`/`update-permissions.ts`).
+    permissions: (row.permisos ?? []).map((permiso) => ({
+      id: permiso.id,
+      order: permiso.orden,
+      role: { id: permiso.idRole, code: "", name: permiso.nombre },
+      workSchedule: { id: permiso.idJornada, code: "", name: permiso.jornada },
+      status: permiso.estado === "ACTIVO" ? ("ACTIVE" as const) : ("SUSPENDED" as const),
+      campusId: permiso.idSede,
+      campusName: permiso.sede,
     })),
     status: "ACTIVE",
     establishment:

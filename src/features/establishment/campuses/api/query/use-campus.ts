@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 
 import { api } from "@/lib/api-client"
-import { apiPath } from "@/lib/api-paths"
 import { unwrapRow } from "@/lib/response-envelope"
 import { env } from "@/config/env"
 
@@ -12,29 +11,26 @@ interface CampusQueryResult {
   campus: Campus
 }
 
-/** Fila cruda de `fn_sed_buscar_por_pk` (V52) — columnas sueltas de TSEDE,
- * `fk_tlv_zona` sin resolver (sin `code`/`name`, solo el id). */
+/** Fila cruda de `pigse.fn_sed_buscar_por_pk` (V370). */
 interface RealCampusDetailRow {
-  pk_tsede: number
+  pk_sede: number
   codigo: string
   nombre: string
+  consecutivo: string
   fk_tlv_zona: number | null
-  fk_testablecimiento: number
+  localidad: string | null
   comuna: string | null
   barrio: string | null
   direccion: string | null
   telefono: string | null
+  fk_establecimiento: number
+  establecimiento_nombre: string
+  georeferenciacion: string | null
 }
 
-/**
- * `zone` sale con `code`/`name` vacíos: la query no hace join contra
- * `TLISTA_VALOR` (`fn_sed_buscar_por_pk` no lo resuelve), solo trae el id.
- * El caller (dialog-manage.tsx) ya tiene el catálogo de zonas cargado para
- * completar el nombre — ver ahí.
- */
 function toCampus(row: RealCampusDetailRow): Campus {
   return {
-    id: row.pk_tsede,
+    id: row.pk_sede,
     name: row.nombre,
     dane: row.codigo ?? "",
     zone: row.fk_tlv_zona === null ? null : { id: row.fk_tlv_zona, code: "", name: "" },
@@ -47,12 +43,12 @@ function toCampus(row: RealCampusDetailRow): Campus {
 
 async function fetchCampus(id: number): Promise<CampusQueryResult> {
   if (env.ENABLE_API_MOCKING) {
-    return api.get(apiPath(`/establishments/campuses/${id}`, `/establecimientos/sedes/${id}`))
+    return api.get(`/establishments/campuses/${id}`)
   }
 
-  // fn_sed_buscar_por_pk (V52) — fila cruda envuelta en {rows:[...]}.
+  // GET /pigse/sedes/:id -- fila cruda envuelta en {rows:[...]}.
   const row = unwrapRow<RealCampusDetailRow>(
-    (await api.get(`/eval-col/establecimientos/sedes/${id}`)) as unknown as
+    (await api.get(`/pigse/sedes/${id}`)) as unknown as
       | { rows: RealCampusDetailRow[] }
       | RealCampusDetailRow,
   )
