@@ -25,19 +25,6 @@ export interface Employee {
   permissions: Permission[]
 
   status: EmployeeStatus
-
-  /**
-   * Establecimiento y cargo del funcionario en PIGSE (`pigse.TFUNCIONARIO`,
-   * `fn_fun_crear`/`fn_fun_actualizar`, V257/V369) — a diferencia de todos
-   * los campos de arriba (CEVAL: clase/jornada/grado/nivel/fuente/cargo
-   * funcional/vinculación/dirección/permisos por rol+jornada+estado, que NO
-   * existen en el modelo de PIGSE, ver V365/V366), estos dos SÍ tienen
-   * columna real en pigse.TFUNCIONARIO. Opcionales para no romper el flujo
-   * de `add-establishment-page.tsx` (institution), que sigue construyendo
-   * un `Employee` "vacío" para registrar rector/secretaria sin tocarlos.
-   */
-  establishment?: CatalogItem | null
-  cargo?: CatalogItem | null
 }
 
 export interface EmployeeListItem {
@@ -67,6 +54,12 @@ export interface EmployeeListItem {
 export interface EmployeesQueryFilters {
   search?: string
   establecimientos?: number[]
+  /** Nombres de rol (`public.role.name`), no ids ni códigos — ver V386. */
+  roles?: string[]
+  /** Nombres de jornada (`TLISTA_VALOR.NOMBRE`) — ver V386. */
+  workSchedules?: string[]
+  /** Estado de los permisos del funcionario, en el vocabulario de la UI. */
+  statuses?: EmployeeStatus[]
 }
 
 export interface EmployeesQueryRequest {

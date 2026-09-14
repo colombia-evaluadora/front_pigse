@@ -14,17 +14,62 @@ import type {
 } from "@/features/establishment/employees/api/types/employee"
 
 /**
+ * El estado de un permiso en la UI es "ACTIVE"/"SUSPENDED"; en la base
+ * (`pigse.TSEDE_USUARIO.TLV_ESTADO`, contra lo que matchea
+ * `BODY.FILTERS.ESTADO`) es 'ACTIVO'/'INACTIVO'. Mismo mapeo que hace
+ * `toEmployeeListItem` al leer, en la dirección contraria.
+ */
+const ESTADO_POR_ESTADO_UI: Record<EmployeeStatus, string> = {
+  ACTIVE: "ACTIVO",
+  SUSPENDED: "INACTIVO",
+}
+
+/**
  * Normaliza los filtros de la UI a lo que espera el backend real de PIGSE.
  *
- * `pigse.fn_fun_listar` (V368/query-service) solo declara
- * `BODY.FILTERS.SEARCH` y `BODY.FILTERS.ESTABLECIMIENTOS` en su
- * `param_types` — no tiene concepto de roles/jornadas como filtro. Mandar
- * `roles`/`workSchedules` (aunque sea `[]`) hace que el validador de
- * placeholders del query-service los vea como claves sin tipo declarado y
- * responda 400: "tiene placeholders sin tipo declarado: [BODY.FILTERS.ROLES,
- * BODY.FILTERS.WORKSCHEDULES]".
+ * Desde V386 `pigse.fn_fun_listar` declara, además de `BODY.FILTERS.SEARCH` y
+ * `BODY.FILTERS.ESTABLECIMIENTOS`, los binds `BODY.FILTERS.ROL`,
+ * `BODY.FILTERS.JORNADA` y `BODY.FILTERS.ESTADO` (`VARCHAR[]`): un funcionario
+ * matchea si AL MENOS UNO de sus permisos activos coincide. Las claves son las
+ * del `param_types` del query-service —singulares y en español—, no las del
+ * estado de la UI: mandar `roles`/`workSchedules` devolvería 400 por
+ * "placeholders sin tipo declarado".
+ *
+ * Rol y jornada viajan por NOMBRE (la función compara `public.role.name` y
+ * `TLISTA_VALOR.NOMBRE`), no por id ni por código.
+ *
+ * Mismo formato de arreglo real (no cadena separada por comas) que el
+ * `establecimientos` que ya existía.
  */
 export function toEmployeesQueryFilters(filters: EmployeesQueryRequest["filters"]) {
+  return {
+    search: filters.search ?? "",
+    establecimientos: filters.establecimientos ?? [],
+    // `null`, no `[]`: un VARCHAR[] vacío serializa como el literal JSON
+    // "[]", que Postgres rechaza al bindear ("malformed array literal") --
+    // encontrado en vivo, rompía CADA carga sin filtro de rol/jornada/estado
+    // activo (el caso por defecto). `null` es la otra rama que la función ya
+    // acepta (`p_roles IS NULL OR CARDINALITY(p_roles) = 0`), y sí bindea
+    // bien. `establecimientos` (arriba) es BIGINT[] y no le pasa esto.
+    rol: filters.roles?.length ? filters.roles : null,
+    jornada: filters.workSchedules?.length ? filters.workSchedules : null,
+    estado: filters.statuses?.length
+      ? filters.statuses.map((status) => ESTADO_POR_ESTADO_UI[status])
+      : null,
+  }
+}
+
+/**
+ * Los filtros que acepta el REPORTE de funcionarios.
+ *
+ * Deliberadamente más angosto que el del listado: V386 agregó los binds nuevos
+ * a la fila `/funcionarios/query` de `public.query`, pero la fila de reporte
+ * del `reporting-service` quedó con su juego de tipos viejo. Mandarle
+ * `rol`/`jornada`/`estado` la haría fallar con el 400 de "placeholders sin
+ * tipo declarado" — o sea, la tabla andando y la exportación rota sobre
+ * exactamente los mismos filtros.
+ */
+export function toEmployeesReportFilters(filters: EmployeesQueryRequest["filters"]) {
   return {
     search: filters.search ?? "",
     establecimientos: filters.establecimientos ?? [],
