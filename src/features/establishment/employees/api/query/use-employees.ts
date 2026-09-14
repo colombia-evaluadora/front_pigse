@@ -45,9 +45,17 @@ export function toEmployeesQueryFilters(filters: EmployeesQueryRequest["filters"
   return {
     search: filters.search ?? "",
     establecimientos: filters.establecimientos ?? [],
-    rol: filters.roles ?? [],
-    jornada: filters.workSchedules ?? [],
-    estado: (filters.statuses ?? []).map((status) => ESTADO_POR_ESTADO_UI[status]),
+    // `null`, no `[]`: un VARCHAR[] vacío serializa como el literal JSON
+    // "[]", que Postgres rechaza al bindear ("malformed array literal") --
+    // encontrado en vivo, rompía CADA carga sin filtro de rol/jornada/estado
+    // activo (el caso por defecto). `null` es la otra rama que la función ya
+    // acepta (`p_roles IS NULL OR CARDINALITY(p_roles) = 0`), y sí bindea
+    // bien. `establecimientos` (arriba) es BIGINT[] y no le pasa esto.
+    rol: filters.roles?.length ? filters.roles : null,
+    jornada: filters.workSchedules?.length ? filters.workSchedules : null,
+    estado: filters.statuses?.length
+      ? filters.statuses.map((status) => ESTADO_POR_ESTADO_UI[status])
+      : null,
   }
 }
 

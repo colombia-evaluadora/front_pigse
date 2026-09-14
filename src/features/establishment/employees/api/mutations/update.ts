@@ -6,14 +6,20 @@ import type { Employee } from "@/features/establishment/employees/api/types/empl
 
 /**
  * Adapta `Employee` al contrato real de `PUT /funcionarios/:ID`
- * (`pigse.fn_fun_actualizar`, V257/V369 — uuid `pigse-funcionarios-actualizar`).
+ * (`pigse.fn_fun_actualizar`, V390 — uuid `pigse-funcionarios-actualizar`).
  *
- * Los binds son TOP-LEVEL (`:BODY.CORREO_ELECTRONICO`, no
- * `:BODY.PERSON.CORREO_ELECTRONICO`) y solo declaran los 10 campos que
- * `fn_fun_actualizar` acepta — nada de `employeeClass`/`educationLevel`/
- * `permissions`/etc. (modelo de CEVAL, sin columna en `pigse.TFUNCIONARIO`,
- * ver V365/V366): mandarlos dispara el 400 de "placeholders sin tipo
- * declarado" (mismo bug que `/funcionarios/query` con roles/workSchedules).
+ * Los binds son TOP-LEVEL (`:BODY.CORREOELECTRONICO`, no
+ * `:BODY.PERSON.CORREOELECTRONICO`) — mandar cualquier clave no declarada
+ * dispara el 400 de "placeholders sin tipo declarado" (mismo bug que
+ * `/funcionarios/query` con roles/workSchedules).
+ *
+ * `fkEstablecimiento`/`fkTlvCargo` YA NO se mandan desde acá (V390): el
+ * establecimiento de un funcionario se deriva de la sede al asignarle un
+ * permiso (`fn_fun_permisos_actualizar`), y el cargo lo cubre el rol —
+ * igual que en Colombia Evaluadora, que tiene las mismas columnas pero
+ * tampoco las pide en el formulario. `employeeClass`/`educationLevel`/etc.
+ * ("información complementaria", V390) SÍ viajan, con los mismos nombres
+ * squasheados en camelCase que el resto de los binds.
  *
  * `password`/`birthDate`/`gender`/foto de perfil NO viajan por acá: esta
  * query no los declara (la contraseña la fija el propio usuario, no un
@@ -30,8 +36,14 @@ function toRealBackendPayload(values: Employee) {
     segundoApellido: values.person.secondLastName || undefined,
     telefono: values.person.phone || undefined,
     fkTlvTipoDocumento: values.person.documentType?.id ?? undefined,
-    fkTlvCargo: values.cargo?.id ?? undefined,
-    fkEstablecimiento: values.establishment?.id ?? undefined,
+    fkTlvClaseFuncionario: values.employeeClass?.id ?? undefined,
+    fkTlvNivelEnsenanza: values.educationLevel?.id ?? undefined,
+    fkTlvGradoEscalafon: values.grade?.id ?? undefined,
+    fkTlvNivelEducativo: values.highestEducationLevel?.id ?? undefined,
+    fkTlvFuenteRecurso: values.fundingSource?.id ?? undefined,
+    fkTlvCargoFuncional: values.functionalPosition?.id ?? undefined,
+    fkTlvTipoVinculacion: values.employmentType?.id ?? undefined,
+    direccion: values.address || undefined,
   }
 }
 
