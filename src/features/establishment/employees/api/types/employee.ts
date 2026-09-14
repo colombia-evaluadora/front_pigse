@@ -28,39 +28,38 @@ export interface Employee {
   permissions: Permission[]
 
   status: EmployeeStatus
+
+  /**
+   * Establecimiento y cargo del funcionario en PIGSE (`pigse.TFUNCIONARIO`,
+   * `fn_fun_crear`/`fn_fun_actualizar`, V257/V369) — a diferencia de todos
+   * los campos de arriba (CEVAL: clase/jornada/grado/nivel/fuente/cargo
+   * funcional/vinculación/dirección/permisos por rol+jornada+estado, que NO
+   * existen en el modelo de PIGSE, ver V365/V366), estos dos SÍ tienen
+   * columna real en pigse.TFUNCIONARIO. Opcionales para no romper el flujo
+   * de `add-establishment-page.tsx` (institution), que sigue construyendo
+   * un `Employee` "vacío" para registrar rector/secretaria sin tocarlos.
+   */
+  establishment?: CatalogItem | null
+  cargo?: CatalogItem | null
 }
 
 export interface EmployeeListItem {
   id: number
   documentNumber: string
   name: string
+  establishmentName: string
   /**
-   * Roles agregados a partir de los permisos del funcionario. Se listan
-   * una sola vez por código, conservando el orden en que aparecen en
-   * `permissions`. Cuando un funcionario tiene varios permisos con
-   * distintos roles, este arreglo contiene todos para renderizarlos
-   * como una lista separada por comas.
+   * Roles del funcionario en su establecimiento (`pigse.TESTABLECIMIENTO_USUARIO`
+   * vía `pigse.fn_fun_listar`) — a diferencia de CEVAL, PIGSE no tiene
+   * concepto de "jornada" ni "estado" por permiso: un funcionario simplemente
+   * tiene uno o más roles asignados en su establecimiento.
    */
   roles: CatalogItem[]
-  /**
-   * Jornadas agregadas desde los permisos, igual que `roles`: un funcionario
-   * puede tener permisos en más de una jornada (mañana y tarde, por ejemplo),
-   * así que la celda las lista separadas por comas. Vacío mientras no tenga
-   * permisos asignados.
-   */
-  workSchedules: CatalogItem[]
-  /**
-   * Estados agregados desde los permisos del funcionario. Análogo a
-   * `roles`: se preserva el orden de aparición, sin duplicados.
-   */
-  statuses: PermissionStatus[]
 }
 
 export interface EmployeesQueryFilters {
   search?: string
-  roles?: string[]
-  workSchedules?: string[]
-  statuses?: EmployeeStatus[]
+  establecimientos?: number[]
 }
 
 export interface EmployeesQueryRequest {

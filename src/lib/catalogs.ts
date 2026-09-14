@@ -26,4 +26,8 @@ export const CATALOGS = {
   DISABILITIES: "disabilities",
   LICENSE_STATUSES: "license-statuses",
   ENTITY_STATUSES: "entity-statuses",
+  // Cargo del funcionario en PIGSE (pigse.tfuncionario.FK_TLV_CARGO,
+  // categoría real CARGO) — distinto de FUNCTIONAL_POSITIONS/NOMBRE_CARGO,
+  // que es un catálogo distinto ya usado por CEVAL.
+  CARGOS: "cargos",
 } as const
