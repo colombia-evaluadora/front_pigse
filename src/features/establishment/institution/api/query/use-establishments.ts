@@ -26,10 +26,13 @@ import type {
  * tabla funcionaba y el reporte fallaba con 400 sobre los mismos filtros.
  */
 export function toEstablishmentsQueryFilters(filters: EstablishmentsQueryRequest["filters"]) {
-  // `status` viaja tal cual: desde V116 el backend filtra por CÓDIGO de
-  // estado (A, I, S, SC, ST), no por id, así que convertirlo a número
-  // rompería el bind (VARCHAR[]).
-  return { ...filters, status: filters.status ?? [] }
+  // `pigse.fn_est_listar` (V387) NO declara ningun parametro de estado --
+  // a diferencia de lo que asumia un comentario anterior aca, mandar
+  // `status` (aunque sea `[]`) dispara el 400 de "placeholders sin tipo
+  // declarado" en CADA carga de la tabla, encontrado en vivo. Se omite del
+  // body hasta que el backend lo soporte.
+  const { status: _status, ...rest } = filters
+  return rest
 }
 
 interface UseEstablishmentsQueryParams {
