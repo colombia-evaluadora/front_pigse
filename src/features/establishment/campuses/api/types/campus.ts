@@ -32,6 +32,8 @@ export interface EstablishmentOption {
 export interface CampusesQueryFilters {
   search?: string
   establishmentId?: number | null
+  /** Nombres de zona (`TLISTA_VALOR.NOMBRE`), no ids — ver V386. */
+  zones?: string[]
 }
 
 export interface CampusesQueryRequest {

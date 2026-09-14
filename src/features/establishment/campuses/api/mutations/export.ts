@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query"
 
 import { downloadReport } from "@/lib/report-client"
-import { toCampusesQueryFilters } from "@/features/establishment/campuses/api/query/use-campuses"
+import { toCampusesReportFilters } from "@/features/establishment/campuses/api/query/use-campuses"
 import type { MutationConfig } from "@/lib/react-query"
 import type { CampusesQueryRequest } from "@/features/establishment/campuses/api/types/campus"
 import type { ExportFormat, ExportResult } from "@/features/establishment/institution/api/types/export"
@@ -17,13 +17,13 @@ function exportCampuses(input: ExportCampusesInput): Promise<ExportResult> {
   // llegan NULL y la funcion los ignora, o sea que sin filtros sale todo.
   // `downloadReport` dispara la descarga y devuelve el {status, message}
   // que este dialogo ya sabia consumir.
-  // Los MISMOS filtros normalizados que manda el listado. Sin esta
-  // conversión los `<Select>` mandan los ids como texto y el query-service
-  // rechaza el bind BIGINT[] con 400: la tabla andaba y el reporte fallaba
-  // sobre exactamente los mismos filtros.
+  // Los filtros normalizados, pero solo los que la fila de reporte declara:
+  // ver `toCampusesReportFilters`. Sin esta conversión los `<Select>` mandan
+  // los ids como texto y el query-service rechaza el bind BIGINT[] con 400:
+  // la tabla andaba y el reporte fallaba sobre exactamente los mismos filtros.
   return downloadReport("sedes", {
     format: input.format,
-    filters: toCampusesQueryFilters(input.filters),
+    filters: toCampusesReportFilters(input.filters),
   })
 }
 
