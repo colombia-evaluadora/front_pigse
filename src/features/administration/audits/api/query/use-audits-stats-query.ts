@@ -31,5 +31,11 @@ export function useAuditsStatsQuery(params: AuditsStatsRequest) {
     queryKey: ["audits", "stats", params],
     queryFn: () => fetchAuditsStats(params),
     placeholderData: (previous) => previous,
+    // Mismo criterio que useAuditsQuery (la lista que acompañan estas
+    // tarjetas): sin esto, el staleTime global de 60s (queryConfig) deja
+    // las tarjetas mostrando números de hasta un minuto atrás al volver a
+    // entrar a la pantalla, mientras la lista de abajo (que sí revalida)
+    // ya muestra datos nuevos -- exactamente el desfase reportado en vivo.
+    staleTime: 0,
   })
 }

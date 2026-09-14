@@ -50,5 +50,10 @@ export function useTableOperationsStatsQuery(params: UseTableOperationsStatsQuer
     queryKey: ["audit-tables", params.tableSlug, "operations", "stats", params],
     queryFn: () => fetchTableOperationsStats(params),
     placeholderData: (previous) => previous,
+    // Mismo criterio que useTableOperationsQuery (la lista que acompañan
+    // estas tarjetas): sin esto, el staleTime global de 60s deja las
+    // tarjetas Insert/Update/Delete mostrando números de hasta un minuto
+    // atrás al volver a entrar a la pantalla, mientras la lista sí revalida.
+    staleTime: 0,
   })
 }
