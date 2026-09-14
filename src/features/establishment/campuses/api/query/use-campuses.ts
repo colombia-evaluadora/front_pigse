@@ -13,22 +13,16 @@ import type {
 } from "@/features/establishment/campuses/api/types/campus"
 
 /**
- * Normaliza los filtros de la UI a lo que espera el backend.
- *
- * Los `<Select>` del buscador mandan el id como TEXTO (`String(item.id)`),
- * pero los binds del catálogo están declarados `BIGINT[]` y el query-service
- * valida el tipo de cada elemento: un `["1"]` donde espera `[1]` se rechaza
- * con 400.
- *
- * Se exporta —y no queda embebido en el body de la consulta— porque la
- * exportación manda EXACTAMENTE los mismos filtros y tiene que aplicar la
- * misma conversión. Cuando esto vivía solo dentro del hook de listado, la
- * tabla funcionaba y el reporte fallaba con 400 sobre los mismos filtros.
+ * `pigse.fn_sed_listar` (V370/V371) solo declara `BODY.FILTERS.SEARCH` y
+ * `BODY.FILTERS.ESTABLECIMIENTO` -- sin filtro por zona (a diferencia de
+ * CEVAL). Mandar `zones` dispara el 400 de "placeholders sin tipo
+ * declarado" (mismo bug que `/funcionarios/query`).
  */
 export function toCampusesQueryFilters(filters: CampusesQueryRequest["filters"]) {
-  // `zones` viaja tal cual: desde V116 el backend filtra por CÓDIGO de zona,
-  // no por id, así que convertir a número rompería el bind (VARCHAR[]).
-  return { ...filters, zones: filters.zones ?? [] }
+  return {
+    search: filters.search ?? "",
+    establecimiento: filters.establishmentId ?? undefined,
+  }
 }
 
 interface UseCampusesQueryParams {
@@ -38,9 +32,7 @@ interface UseCampusesQueryParams {
   pageSize: number
 }
 
-/** Fila cruda de `fn_sed_listar_paginado` (V52) — a diferencia de
- * `fn_sed_listar_todos` (usado en el selector de sedes), esta versión
- * paginada NO trae `barrio`/`comuna`, solo lo que se ve en la tabla. */
+/** Fila cruda de `pigse.fn_sed_listar` (V370/V371). */
 interface RealCampusRow {
   pk_sede: number
   codigo: string
@@ -48,6 +40,8 @@ interface RealCampusRow {
   consecutivo: string
   fk_zona: number | null
   zona_nombre: string | null
+  fk_establecimiento: number
+  establecimiento_nombre: string
   direccion: string | null
   telefono: string | null
 }
@@ -58,8 +52,8 @@ function toCampus(row: RealCampusRow): Campus {
     name: row.nombre,
     dane: row.codigo ?? "",
     zone: row.fk_zona === null ? null : { id: row.fk_zona, code: "", name: row.zona_nombre ?? "" },
-    // No vienen en este listado (ver comentario de RealCampusRow); solo se
-    // completan al abrir el detalle/edición, que sí trae el objeto entero.
+    // No vienen en este listado (mismo criterio que CEVAL): solo se
+    // completan al abrir el detalle/edición.
     neighborhood: "",
     commune: "",
     address: row.direccion ?? "",
@@ -69,32 +63,22 @@ function toCampus(row: RealCampusRow): Campus {
 
 async function fetchCampuses(params: CampusesQueryRequest): Promise<CampusesQueryResponse> {
   if (env.ENABLE_API_MOCKING) {
-    const response = await api.query(
-      apiPath("/establishments/campuses/query", "/establecimientos/sedes/query"),
-      params,
-    )
+    const response = await api.query(apiPath("/establishments/campuses/query", "/sedes/query"), params)
     return unwrapPaginated(response)
   }
 
-  // El mock espera `sorting` como array tal cual; el backend real espera un
-  // único objeto (o null) — ver `toSingleSort`.
   const body = {
-    ...params,
     filters: toCampusesQueryFilters(params.filters),
     sorting: toSingleSort(params.sorting),
+    pageIndex: params.pageIndex,
+    pageSize: params.pageSize,
   }
-  const response = await api.query(
-    apiPath("/establishments/campuses/query", "/establecimientos/sedes/query"),
-    body,
-  )
+  const response = await api.query(apiPath("/establishments/campuses/query", "/sedes/query"), body)
   const result = unwrapPaginated<RealCampusRow>(response)
   return { ...result, rows: result.rows.map(toCampus) }
 }
 
-export const campusesQueryKey = (params: UseCampusesQueryParams) => [
-  "campuses",
-  params,
-]
+export const campusesQueryKey = (params: UseCampusesQueryParams) => ["campuses", params]
 
 export function useCampusesQuery(params: UseCampusesQueryParams) {
   return useQuery({

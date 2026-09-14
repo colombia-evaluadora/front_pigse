@@ -11,12 +11,13 @@ export interface DeleteCampusResult {
 }
 
 /**
- * PUT, no DELETE: es `fn_sed_soft_delete` (ACTIVE=FALSE), registrado en el
- * SSO real como `PUT /establecimientos/sedes/:ID`.
+ * PATCH, no PUT: `pigse.fn_sed_soft_delete` (ACTIVE=FALSE) se registró como
+ * `PATCH /sedes/:ID` -- PUT en ese mismo path es `fn_sed_actualizar`
+ * (`create.ts`). Mismo criterio que el resto del módulo (funcionarios).
  */
 function deleteCampus(id: number): Promise<DeleteCampusResult> {
-  const url = apiPath(`/establishments/campuses/${id}`, `/establecimientos/sedes/${id}`)
-  return env.ENABLE_API_MOCKING ? api.delete(url) : api.put(url)
+  const url = apiPath(`/establishments/campuses/${id}`, `/sedes/${id}`)
+  return env.ENABLE_API_MOCKING ? api.delete(url) : api.patch(url)
 }
 
 interface UseDeleteOptions {
