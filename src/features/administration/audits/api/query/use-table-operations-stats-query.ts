@@ -28,10 +28,11 @@ async function fetchTableOperationsStats({
     return api.query(path, body)
   }
 
-  // V85 §1.6 solo declara el rango de fechas: ni `ids` (las stats de la
-  // selección) ni autor/operación entran en esa fila de catálogo, así que
-  // las tarjetas muestran el total del rango, no el de lo seleccionado.
+  // V384: BODY.IDS (operationId "lsn-seq" separados por coma) tiene
+  // prioridad sobre el rango de fechas en el backend -- las stats de la
+  // selección ya reflejan lo marcado, no el total del rango.
   const response = await api.query<RowsEnvelope<TableOperationsStats>>(path, {
+    ids: (body.ids ?? []).join(","),
     filters: {
       occurredFrom: toBind(body.filters?.occurredFrom),
       occurredTo: toBind(body.filters?.occurredTo),
@@ -50,5 +51,10 @@ export function useTableOperationsStatsQuery(params: UseTableOperationsStatsQuer
     queryKey: ["audit-tables", params.tableSlug, "operations", "stats", params],
     queryFn: () => fetchTableOperationsStats(params),
     placeholderData: (previous) => previous,
+    // Mismo criterio que useTableOperationsQuery (la lista que acompañan
+    // estas tarjetas): sin esto, el staleTime global de 60s deja las
+    // tarjetas Insert/Update/Delete mostrando números de hasta un minuto
+    // atrás al volver a entrar a la pantalla, mientras la lista sí revalida.
+    staleTime: 0,
   })
 }
