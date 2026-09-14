@@ -23,6 +23,9 @@ export function useEmployeesFilters(): EmployeesFilters {
         search: (prev) => ({
           ...prev,
           search: values.search || undefined,
+          roles: values.roles.length ? values.roles : undefined,
+          workSchedules: values.workSchedules.length ? values.workSchedules : undefined,
+          statuses: values.statuses.length ? values.statuses : undefined,
           page: 0,
         }),
         replace: true,
@@ -36,6 +39,9 @@ export function useEmployeesFilters(): EmployeesFilters {
       search: (prev) => ({
         ...prev,
         search: undefined,
+        roles: undefined,
+        workSchedules: undefined,
+        statuses: undefined,
         page: 0,
       }),
       replace: true,
@@ -45,17 +51,28 @@ export function useEmployeesFilters(): EmployeesFilters {
   const queryFilters = useMemo(
     () => ({
       search: search.search,
+      roles: search.roles,
+      workSchedules: search.workSchedules,
+      statuses: search.statuses,
     }),
-    [search.search],
+    [search.search, search.roles, search.workSchedules, search.statuses],
   )
 
   const activeFilterCount = useMemo(() => {
-    return search.search ? 1 : 0
-  }, [search.search])
+    let count = 0
+    if (search.search) count += 1
+    count += search.roles?.length ?? 0
+    count += search.workSchedules?.length ?? 0
+    count += search.statuses?.length ?? 0
+    return count
+  }, [search.search, search.roles, search.workSchedules, search.statuses])
 
   return {
     filters: {
       search: search.search ?? "",
+      roles: search.roles ?? [],
+      workSchedules: search.workSchedules ?? [],
+      statuses: search.statuses ?? [],
     },
     queryFilters,
     applyFilters,

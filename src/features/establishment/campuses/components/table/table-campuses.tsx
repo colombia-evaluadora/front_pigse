@@ -18,6 +18,9 @@ import {
 
 import { useCampusesFilters } from "@/features/establishment/campuses/hooks/use-filters"
 import { useCampusesQuery } from "@/features/establishment/campuses/api/query/use-campuses"
+import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
+import { CATALOGS } from "@/lib/catalogs"
+import type { CatalogItem } from "@/types/catalog"
 import {
   useBulkDelete,
   summarizeCampusBulkDelete,
@@ -48,6 +51,10 @@ export function CampusesDataTable({ onEditCampus, title, action }: CampusesDataT
 
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useCampusesFilters()
+
+  // La misma fuente que el combobox "Zona" del formulario de alta/edición
+  // (ver `dialog-manage.tsx`).
+  const { data: zones = [] } = useCatalogQuery<CatalogItem>(CATALOGS.ZONES)
 
   const { data, isPending, isError, refetch } = useCampusesQuery({
     filters: queryFilters,
@@ -119,6 +126,7 @@ export function CampusesDataTable({ onEditCampus, title, action }: CampusesDataT
             applyFilters={applyFilters}
             clearAllFilters={clearAllFilters}
             activeFilterCount={activeFilterCount}
+            zones={zones}
           />
 
           <TableScreenActions>

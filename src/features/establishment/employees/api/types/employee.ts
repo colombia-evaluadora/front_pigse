@@ -67,6 +67,12 @@ export interface EmployeeListItem {
 export interface EmployeesQueryFilters {
   search?: string
   establecimientos?: number[]
+  /** Nombres de rol (`public.role.name`), no ids ni códigos — ver V386. */
+  roles?: string[]
+  /** Nombres de jornada (`TLISTA_VALOR.NOMBRE`) — ver V386. */
+  workSchedules?: string[]
+  /** Estado de los permisos del funcionario, en el vocabulario de la UI. */
+  statuses?: EmployeeStatus[]
 }
 
 export interface EmployeesQueryRequest {

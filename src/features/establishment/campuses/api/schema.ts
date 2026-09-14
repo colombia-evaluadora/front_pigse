@@ -2,6 +2,9 @@ import { z } from "zod"
 
 export const campusFiltersFormSchema = z.object({
   search: z.string(),
+  // Por NOMBRE de zona: `pigse.fn_sed_listar` (V386) compara el
+  // `TLISTA_VALOR.NOMBRE` de la zona contra un `VARCHAR[]`, no el id.
+  zones: z.array(z.string()),
 })
 
 export type CampusFiltersFormInput = z.input<typeof campusFiltersFormSchema>
@@ -14,6 +17,7 @@ export const campusesSearchSchema = z.object({
   sortBy: z.string().optional().catch(undefined),
   sortDir: z.enum(["asc", "desc"]).optional().catch(undefined),
   search: z.string().optional().catch(undefined),
+  zones: z.array(z.string()).optional().catch(undefined),
 })
 
 export type CampusesSearch = z.infer<typeof campusesSearchSchema>
