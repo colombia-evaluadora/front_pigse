@@ -11,7 +11,6 @@ import { upsertPerson } from "@/mocks/db/persons"
 
 import type {
   Employee,
-  EmployeeStatus,
   EmployeesQueryRequest,
   EmployeesQueryResponse,
 } from "@/features/establishment/employees/api/types/employee"
@@ -24,12 +23,6 @@ import type {
 const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
   pdf: "PDF",
   excel: "Excel",
-}
-
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
-    : []
 }
 
 function asIdArray(value: unknown): number[] {
@@ -45,9 +38,7 @@ function parseEmployeesRequest(body: Partial<EmployeesQueryRequest> | null): Emp
   return {
     filters: {
       search: typeof body?.filters?.search === "string" ? body.filters.search : undefined,
-      roles: asStringArray(body?.filters?.roles),
-      workSchedules: asStringArray(body?.filters?.workSchedules),
-      statuses: asStringArray(body?.filters?.statuses) as EmployeeStatus[],
+      establecimientos: asIdArray(body?.filters?.establecimientos),
     },
     sorting: Array.isArray(body?.sorting)
       ? body.sorting
@@ -92,29 +83,6 @@ function applyFilters(
       }
     }
 
-    // El `<Select>` del buscador manda `String(item.id)`, no el `code` (ver
-    // search-employees.tsx) — mismo criterio que el backend real.
-    if (
-      filters.roles?.length &&
-      !row.roles.some((role) => filters.roles!.includes(String(role.id)))
-    ) {
-      return false
-    }
-
-    if (
-      filters.workSchedules?.length &&
-      !row.workSchedules.some((schedule) => filters.workSchedules?.includes(String(schedule.id)))
-    ) {
-      return false
-    }
-
-    if (
-      filters.statuses?.length &&
-      !row.statuses.some((status) => filters.statuses!.includes(status))
-    ) {
-      return false
-    }
-
     return true
   })
 }
@@ -135,25 +103,21 @@ function applySorting(
         ? a.documentNumber
         : id === "name"
           ? a.name
-          : id === "role"
-            ? (a.roles[0]?.name ?? "")
-            : id === "workSchedule"
-              ? (a.workSchedules[0]?.name ?? "")
-              : id === "status"
-                ? (a.statuses[0] ?? "")
-                : ""
+          : id === "establishmentName"
+            ? a.establishmentName
+            : id === "role"
+              ? (a.roles[0]?.name ?? "")
+              : ""
     const bv =
       id === "documentNumber"
         ? b.documentNumber
         : id === "name"
           ? b.name
-          : id === "role"
-            ? (b.roles[0]?.name ?? "")
-            : id === "workSchedule"
-              ? (b.workSchedules[0]?.name ?? "")
-              : id === "status"
-                ? (b.statuses[0] ?? "")
-                : ""
+          : id === "establishmentName"
+            ? b.establishmentName
+            : id === "role"
+              ? (b.roles[0]?.name ?? "")
+              : ""
 
     if (av === bv) {
       return 0

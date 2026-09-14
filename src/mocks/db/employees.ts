@@ -75,10 +75,10 @@ function createEmployee(): Employee {
 
 export function createEmployeeRow(employee: Employee & { id: number }): EmployeeListItem {
   /**
-   * Roles del funcionario, agregados desde sus permisos y deduplicados por
-   * `code` preservando el orden. Si no hay permisos todavía (caso del primer
-   * Guardar del flujo de creación), la lista queda vacía y la celda muestra
-   * "—", igual que la columna de estado.
+   * PIGSE no tiene "permisos" con jornada/estado: el rol se toma directo de
+   * los permisos del borrador (el mock sigue reusando `Employee`/`permissions`
+   * porque el diálogo de alta/edición aún no se adaptó al modelo real de
+   * PIGSE — ver `dialog-manage.tsx`), deduplicado por `code`.
    */
   const rolesByCode = new Map<string, CatalogItem>()
   for (const permission of employee.permissions) {
@@ -87,24 +87,6 @@ export function createEmployeeRow(employee: Employee & { id: number }): Employee
     }
   }
   const roles: CatalogItem[] = Array.from(rolesByCode.values())
-
-  // Mismo criterio para las jornadas: un funcionario puede tener permisos en
-  // varias y la columna las muestra todas, no solo la del primer permiso.
-  const workSchedulesByCode = new Map<string, CatalogItem>()
-  for (const permission of employee.permissions) {
-    if (!workSchedulesByCode.has(permission.workSchedule.code)) {
-      workSchedulesByCode.set(permission.workSchedule.code, permission.workSchedule)
-    }
-  }
-  const workSchedules: CatalogItem[] = Array.from(workSchedulesByCode.values())
-
-  /**
-   * Estados del funcionario, agregados desde sus permisos y deduplicados
-   * preservando el orden de aparición. Si todavía no hay permisos
-   * (primer Guardar sin catálogos), la lista queda vacía y la celda
-   * muestra "—" como placeholder.
-   */
-  const statuses = Array.from(new Set(employee.permissions.map((permission) => permission.status)))
 
   const name = [
     employee.person.firstName,
@@ -119,9 +101,8 @@ export function createEmployeeRow(employee: Employee & { id: number }): Employee
     id: employee.id,
     documentNumber: employee.person.identification,
     name,
+    establishmentName: faker.company.name(),
     roles,
-    workSchedules,
-    statuses,
   }
 }
 

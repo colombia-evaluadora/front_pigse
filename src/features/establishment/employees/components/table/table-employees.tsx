@@ -14,15 +14,10 @@ import {
   TableScreenTitle,
   TableScreenToolbar,
 } from "@/components/layout/table-screen"
-import { CATALOGS } from "@/lib/catalogs"
 import { SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { getErrorMessage } from "@/lib/api-client"
 
-import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
-import { useEmployeeRolesQuery } from "@/features/establishment/employees/api/query/use-employee-roles"
-import { EMPLOYEE_STATUS_OPTIONS } from "@/features/establishment/employees/api/ui-mappings"
 import { useEmployeesFilters } from "@/features/establishment/employees/hooks/use-filters"
-import type { CatalogItem } from "@/types/catalog"
 import type { EmployeeListItem } from "@/features/establishment/employees/api/types/employee"
 import { useEmployeesQuery } from "@/features/establishment/employees/api/query/use-employees"
 import {
@@ -52,12 +47,6 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useEmployeesFilters()
 
-  const { data: roles = [] } = useEmployeeRolesQuery()
-  const { data: workSchedules = [] } = useCatalogQuery<CatalogItem>(CATALOGS.WORK_SCHEDULES)
-
-  // `queryFilters.roles`/`workSchedules` ya traen el `id` (como texto, ver
-  // search-employees.tsx) — `useEmployeesQuery` solo necesita convertirlos a
-  // número, no resolverlos contra ningún catálogo.
   const { data, isPending, isError, refetch } = useEmployeesQuery({
     filters: queryFilters,
     sorting,
@@ -125,9 +114,6 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
             applyFilters={applyFilters}
             clearAllFilters={clearAllFilters}
             activeFilterCount={activeFilterCount}
-            roles={roles}
-            workSchedules={workSchedules}
-            statuses={EMPLOYEE_STATUS_OPTIONS}
           />
 
           <TableScreenActions>
