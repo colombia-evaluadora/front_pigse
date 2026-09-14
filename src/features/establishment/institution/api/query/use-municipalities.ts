@@ -9,9 +9,15 @@ import { unwrapRows } from "@/lib/response-envelope"
 import type { Municipality } from "@/features/establishment/institution/api/types/location"
 
 /** Forma real de cada fila de GET /catalogos/municipios (V58, con el
- * departamento anidado ya resuelto — ver fn_cat_municipios_listar REV2). */
+ * departamento anidado ya resuelto — ver fn_cat_municipios_listar REV2 —
+ * y, cuando la query lo expone, el código DANE real en `codigo`: no
+ * confundir con `pk_municipio`, que es solo la PK interna autoincremental.
+ * Opcional a propósito: la REV3 que agrega `codigo` está confirmada en el
+ * esquema de CEVAL, no en el de `pigse` — si la fila no lo trae, `code`
+ * queda `undefined` (ya es opcional en `Municipality`) y nada se rompe. */
 interface RealMunicipalityRow {
   pk_municipio: number
+  codigo?: string
   nombre: string
   pk_departamento: number
   departamento_nombre: string
@@ -32,6 +38,7 @@ async function fetchMunicipalities(): Promise<Municipality[]> {
   const rows = unwrapRows<RealMunicipalityRow>(response)
   return rows.map((row) => ({
     id: row.pk_municipio,
+    code: row.codigo,
     name: row.nombre,
     department: { id: row.pk_departamento, name: row.departamento_nombre },
   }))
