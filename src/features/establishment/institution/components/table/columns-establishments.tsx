@@ -14,6 +14,30 @@ import {
 } from "@/features/establishment/institution/api/ui-mappings"
 import type { Establishment } from "@/features/establishment/institution/api/types/establishment"
 import { DeleteEstablishmentDialog } from "@/features/establishment/institution/components/dialogs/dialog-delete"
+import { useMenuPermission } from "@/features/navigation/api/use-menu-permission"
+
+function ActionsCell({ establishment }: { establishment: Establishment }) {
+  const { puedeEditar } = useMenuPermission("ESTABLECIMIENTO")
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {puedeEditar ? (
+        <Button
+          type="button"
+          variant="ghost"
+          color="neutral"
+          size="icon-sm"
+          aria-label={`Editar ${establishment.name}`}
+          render={<Link to={paths.app.establishments.edit.getHref(establishment.id)} />}
+          nativeButton={false}
+        >
+          <PencilIcon />
+        </Button>
+      ) : null}
+      <DeleteEstablishmentDialog establishment={establishment} />
+    </div>
+  )
+}
 
 export const columns: ColumnDef<Establishment>[] = [
   {
@@ -82,22 +106,7 @@ export const columns: ColumnDef<Establishment>[] = [
   {
     id: "actions",
     header: () => <span className="sr-only">Acciones</span>,
-    cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          color="neutral"
-          size="icon-sm"
-          aria-label={`Editar ${row.original.name}`}
-          render={<Link to={paths.app.establishments.edit.getHref(row.original.id)} />}
-          nativeButton={false}
-        >
-          <PencilIcon />
-        </Button>
-        <DeleteEstablishmentDialog establishment={row.original} />
-      </div>
-    ),
+    cell: ({ row }) => <ActionsCell establishment={row.original} />,
     enableSorting: false,
     enableHiding: false,
     size: 96,

@@ -8,6 +8,7 @@ import { unwrapPaginated } from "@/lib/response-envelope"
 
 import type {
   EmployeeListItem,
+  EmployeeStatus,
   EmployeesQueryRequest,
   EmployeesQueryResponse,
 } from "@/features/establishment/employees/api/types/employee"
@@ -39,7 +40,8 @@ interface UseEmployeesQueryParams {
 
 /** Fila cruda de `pigse.fn_fun_listar` (V370) — `permisos` es JSONB con
  * rol+sede+jornada+estado por fila (reemplaza el `roles` plano de V257/
- * V368, ver V370). */
+ * V368, ver V370). Mismo shape que el `permisos` de
+ * `fn_fun_buscar_por_pk` (ver `use-employee.ts`). */
 interface RealEmployeeListRow {
   pk_funcionario: number
   pk_usuario: number
@@ -52,7 +54,16 @@ interface RealEmployeeListRow {
   telefono: string | null
   fk_establecimiento: number
   establecimiento_nombre: string
-  permisos: { id: number; idRole: number; nombre: string }[]
+  permisos: {
+    id: number
+    idRole: number
+    nombre: string
+    idSede: number
+    sede: string
+    idJornada: number
+    jornada: string
+    estado: "ACTIVO" | "INACTIVO"
+  }[]
 }
 
 function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
@@ -60,11 +71,25 @@ function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
     .filter(Boolean)
     .join(" ")
 
-  // Un funcionario puede tener el mismo rol en varias sedes -- se dedupe
-  // por `idRole` para la columna "Rol" del listado.
-  const rolesByCode = new Map<number, string>()
+  // Un funcionario puede tener el mismo rol/sede/jornada en varios permisos
+  // -- se dedupe cada dimensión por su id, conservando el orden de aparición,
+  // para las columnas "Rol", "Sede educativa", "Jornada" y "Estado".
+  const rolesById = new Map<number, string>()
+  const campusNames = new Set<string>()
+  const workSchedulesById = new Map<number, string>()
+  const statuses = new Set<EmployeeStatus>()
+
   for (const permiso of row.permisos ?? []) {
-    if (!rolesByCode.has(permiso.idRole)) rolesByCode.set(permiso.idRole, permiso.nombre)
+    if (!rolesById.has(permiso.idRole)) rolesById.set(permiso.idRole, permiso.nombre)
+    if (permiso.sede) campusNames.add(permiso.sede)
+    if (permiso.idJornada !== null && permiso.idJornada !== undefined) {
+      if (!workSchedulesById.has(permiso.idJornada)) {
+        workSchedulesById.set(permiso.idJornada, permiso.jornada)
+      }
+    }
+    // Mismo mapeo que `use-employee.ts`: TSEDE_USUARIO.TLV_ESTADO es
+    // 'ACTIVO'/'INACTIVO' y la UI habla "ACTIVE"/"SUSPENDED".
+    statuses.add(permiso.estado === "ACTIVO" ? "ACTIVE" : "SUSPENDED")
   }
 
   return {
@@ -72,7 +97,14 @@ function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
     documentNumber: row.identificacion,
     name,
     establishmentName: row.establecimiento_nombre,
-    roles: Array.from(rolesByCode, ([id, roleName]) => ({ id, code: "", name: roleName })),
+    roles: Array.from(rolesById, ([id, roleName]) => ({ id, code: "", name: roleName })),
+    campuses: Array.from(campusNames),
+    workSchedules: Array.from(workSchedulesById, ([id, scheduleName]) => ({
+      id,
+      code: "",
+      name: scheduleName,
+    })),
+    statuses: Array.from(statuses),
   }
 }
 

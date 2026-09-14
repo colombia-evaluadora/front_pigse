@@ -33,7 +33,7 @@ type EmployeeRoleCode = (typeof EMPLOYEE_ROLES)[number]["code"]
  * por documento/correo y jamás toca su contraseña en ese camino. Solo tiene
  * que ser una cadena no vacía para no chocar con `@NotBlank` del lado Java.
  */
-const PASSWORD_PLACEHOLDER = "••••••••"
+export const PASSWORD_PLACEHOLDER = "••••••••"
 
 interface UserFormProps {
   role?: EmployeeRoleCode
