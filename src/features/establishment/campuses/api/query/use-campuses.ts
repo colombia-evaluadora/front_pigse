@@ -27,7 +27,12 @@ export function toCampusesQueryFilters(filters: CampusesQueryRequest["filters"])
   return {
     search: filters.search ?? "",
     establecimiento: filters.establishmentId ?? undefined,
-    zona: filters.zones ?? [],
+    // `null`, no `[]`: un VARCHAR[] vacío serializa como "[]" y Postgres lo
+    // rechaza al bindear ("malformed array literal") -- rompía CADA carga
+    // sin filtro de zona activo (el caso por defecto). `null` sí bindea bien
+    // (`p_zonas IS NULL OR CARDINALITY(p_zonas) = 0`, la otra rama que la
+    // función ya acepta).
+    zona: filters.zones?.length ? filters.zones : null,
   }
 }
 
