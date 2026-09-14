@@ -21,9 +21,8 @@ export interface BulkDeleteCampusResult {
 }
 
 /**
- * El SSO real registra esto como `PUT /establecimientos/sedes/bulk-delete`
- * (`fn_sed_soft_delete_bulk`, borrado lógico) con los ids en
- * `{ pks: [...] }`, no un array plano en el body de un DELETE.
+ * `pigse.fn_sed_soft_delete_bulk` (V370) se registró como
+ * `PUT /sedes/eliminar-multiple` con los ids en `{ pks: [...] }`.
  */
 function bulkDeleteCampuses(ids: number[]): Promise<BulkDeleteCampusResult> {
   if (env.ENABLE_API_MOCKING) {
@@ -34,7 +33,7 @@ function bulkDeleteCampuses(ids: number[]): Promise<BulkDeleteCampusResult> {
       data: ids,
     }) as unknown as Promise<BulkDeleteCampusResult>
   }
-  return api.put("/eval-col/establecimientos/sedes/bulk-delete", { pks: ids })
+  return api.put("/pigse/sedes/eliminar-multiple", { pks: ids })
 }
 
 export interface BulkDeleteCampusSummary {

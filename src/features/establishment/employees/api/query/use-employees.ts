@@ -37,9 +37,9 @@ interface UseEmployeesQueryParams {
   pageSize: number
 }
 
-/** Fila cruda de `pigse.fn_fun_listar` (V257/V368) — sin jornada ni estado
- * por permiso, a diferencia de CEVAL: `roles` es JSONB `[{idRole, nombre}]`
- * directo desde `TESTABLECIMIENTO_USUARIO`. */
+/** Fila cruda de `pigse.fn_fun_listar` (V370) — `permisos` es JSONB con
+ * rol+sede+jornada+estado por fila (reemplaza el `roles` plano de V257/
+ * V368, ver V370). */
 interface RealEmployeeListRow {
   pk_funcionario: number
   pk_usuario: number
@@ -52,7 +52,7 @@ interface RealEmployeeListRow {
   telefono: string | null
   fk_establecimiento: number
   establecimiento_nombre: string
-  roles: { idRole: number; nombre: string }[]
+  permisos: { id: number; idRole: number; nombre: string }[]
 }
 
 function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
@@ -60,12 +60,19 @@ function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
     .filter(Boolean)
     .join(" ")
 
+  // Un funcionario puede tener el mismo rol en varias sedes -- se dedupe
+  // por `idRole` para la columna "Rol" del listado.
+  const rolesByCode = new Map<number, string>()
+  for (const permiso of row.permisos ?? []) {
+    if (!rolesByCode.has(permiso.idRole)) rolesByCode.set(permiso.idRole, permiso.nombre)
+  }
+
   return {
     id: row.pk_funcionario,
     documentNumber: row.identificacion,
     name,
     establishmentName: row.establecimiento_nombre,
-    roles: (row.roles ?? []).map((role) => ({ id: role.idRole, code: "", name: role.nombre })),
+    roles: Array.from(rolesByCode, ([id, roleName]) => ({ id, code: "", name: roleName })),
   }
 }
 
