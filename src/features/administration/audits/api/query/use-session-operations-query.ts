@@ -5,7 +5,6 @@ import { api } from "@/lib/api-client"
 import { AUDIT_API_PREFIX, apiPath } from "@/lib/api-paths"
 import { unwrapRows, type RowsEnvelope } from "@/lib/response-envelope"
 import {
-  paginateWindow,
   sortWindow,
   tableNameToSlug,
   toBind,
@@ -87,12 +86,22 @@ async function fetchSessionOperations(
 
   const operations = params.filters.operations
   const tableSlug = params.filters.tableSlug?.trim().toLowerCase()
-  const rows = unwrapRows(response)
-    .map(toSessionOperation)
-    .filter((row) => !operations?.length || operations.includes(row.operation))
-    .filter((row) => !tableSlug || row.tableSlug.toLowerCase().includes(tableSlug))
+  const rawRows = unwrapRows(response)
+  // V376 (sso): el servidor ya pagina de verdad -- esto es la página real.
+  const totalCount = rawRows[0]?.totalCount ?? 0
+  const rows = sortWindow(
+    rawRows
+      .map(toSessionOperation)
+      .filter((row) => !operations?.length || operations.includes(row.operation))
+      .filter((row) => !tableSlug || row.tableSlug.toLowerCase().includes(tableSlug)),
+    params.sorting,
+  )
 
-  return paginateWindow(sortWindow(rows, params.sorting), params.pageIndex, params.pageSize)
+  return {
+    rows,
+    pageCount: Math.max(1, Math.ceil(totalCount / params.pageSize)),
+    totalCount,
+  }
 }
 
 export function useSessionOperationsQuery(params: UseSessionOperationsQueryParams) {

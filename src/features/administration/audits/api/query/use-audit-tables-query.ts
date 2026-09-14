@@ -6,7 +6,6 @@ import { AUDIT_API_PREFIX, apiPath } from "@/lib/api-paths"
 import { unwrapRows, type RowsEnvelope } from "@/lib/response-envelope"
 import {
   DEFAULT_AUDIT_TABLE_ICON,
-  paginateWindow,
   sortWindow,
   toBind,
 } from "@/features/administration/audits/api/real-mapping"
@@ -62,8 +61,16 @@ async function fetchAuditTables(
     pageIndex: params.pageIndex,
     pageSize: params.pageSize,
   })
-  const rows = unwrapRows(response).map(toAuditTable)
-  return paginateWindow(sortWindow(rows, params.sorting), params.pageIndex, params.pageSize)
+  const rawRows = unwrapRows(response)
+  // V376 (sso): el servidor ya pagina de verdad -- esto es la página real.
+  const totalCount = rawRows[0]?.totalCount ?? 0
+  const rows = sortWindow(rawRows.map(toAuditTable), params.sorting)
+
+  return {
+    rows,
+    pageCount: Math.max(1, Math.ceil(totalCount / params.pageSize)),
+    totalCount,
+  }
 }
 
 export const auditTablesQueryKey = (params: UseAuditTablesQueryParams) => ["audit-tables", params]

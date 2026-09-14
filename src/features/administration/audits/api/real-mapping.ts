@@ -17,13 +17,17 @@
  * 2. **`filters.operations` es un solo valor**, no un array: el bind de
  *    arrays contra ClickHouse todavía no está validado, así que la fila de
  *    catálogo declara `BODY.FILTERS.OPERATIONCH` como VARCHAR.
- * 3. **No hay paginación ni ordenamiento server-side.** ClickHouse exige
- *    que `LIMIT`/`OFFSET` sean literales constantes en el texto SQL
- *    (bindearlos falla con "LIMIT expression must be constant"), así que
- *    todas las queries traen un `LIMIT 100` fijo y un `ORDER BY` fijo.
- *    `pageIndex`/`pageSize`/`sorting` viajan igual (están declarados) pero
- *    el SQL los ignora — paginar y ordenar es responsabilidad del cliente
- *    sobre esa ventana de 100 filas.
+ * 3. **La paginación SÍ es real (V376, sso), el ordenamiento NO.** ClickHouse
+ *    exige que `LIMIT`/`OFFSET` sean literales constantes en el texto SQL
+ *    (bindearlos falla con "LIMIT expression must be constant") — el fix fue
+ *    en `QueryService.substituteClickHouseLimitOffset` (query-service):
+ *    sustituye `:BODY.PAGESIZE`/`:BODY.PAGEOFFSET` como enteros literales
+ *    antes del bind normal, en vez de un `LIMIT 100` fijo. `sortWindow` sigue
+ *    reordenando client-side, pero ahora solo DENTRO de la página real que
+ *    ya trajo el servidor (antes reordenaba sobre la ventana entera de 100)
+ *    — el `ORDER BY` del SQL sigue fijo (por fecha descendente), hacerlo
+ *    dinámico requeriría una allowlist de columnas por fila, fuera de
+ *    alcance de V376.
  * 4. **El diff campo-por-campo no viene armado**: `/changes` devuelve
  *    `beforeRaw`/`afterRaw`/`currentRaw`, el JSON crudo de
  *    `fila_old`/`fila_new`, y el diff lo arma la capa de aplicación (acá).
@@ -219,29 +223,4 @@ export function sortWindow<T>(rows: T[], sorting: SortingState): T[] {
     if (typeof left === "number" && typeof right === "number") return (left - right) * factor
     return String(left).localeCompare(String(right)) * factor
   })
-}
-
-export interface WindowedPage<T> {
-  rows: T[]
-  pageCount: number
-  totalCount: number
-}
-
-/**
- * Pagina en el cliente sobre la ventana ya traída.
- *
- * `totalCount` es el largo de la ventana, NO el `totalCount` que calcula el
- * `count() OVER()` del SQL: ese cuenta todas las filas que matchean el
- * filtro (puede ser mucho mayor que 100), y mostrarlo mientras solo 100 son
- * navegables haría que la paginación se contradiga con el contador. Cuando
- * el catálogo resuelva el `LIMIT`/`OFFSET` bindeado (marcado 🔶 en V85),
- * esto se reemplaza por paginación real.
- */
-export function paginateWindow<T>(rows: T[], pageIndex: number, pageSize: number): WindowedPage<T> {
-  const start = pageIndex * pageSize
-  return {
-    rows: rows.slice(start, start + pageSize),
-    pageCount: Math.max(1, Math.ceil(rows.length / pageSize)),
-    totalCount: rows.length,
-  }
 }
