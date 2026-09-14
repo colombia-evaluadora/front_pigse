@@ -40,6 +40,7 @@ import { CATALOGS } from "@/lib/catalogs"
 import { toSelectItemsMap, toSelectOptions } from "@/lib/catalog-options"
 import { SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { getErrorMessage } from "@/lib/api-client"
+import { optionalImageFile } from "@/lib/image-file"
 import { env } from "@/config/env"
 
 import { useCreate } from "@/features/establishment/employees/api/mutations/use-create"
@@ -212,12 +213,23 @@ const employeePersonSchema = z
 function computePersonErrors(
   person: Person | null,
   confirmPassword: string,
+  // La foto es estado aparte (viaja como binario del multipart, no como JSON),
+  // pero se valida en el mismo paso: es el último punto antes de armar el
+  // envío, y sin esto un archivo fuera de regla llegaba entero al gateway.
+  photo?: File | null,
 ): Record<string, string> {
-  if (!person) {
-    return {}
+  const nextErrors: Record<string, string> = {}
+
+  const parsedPhoto = optionalImageFile.safeParse(photo)
+  if (!parsedPhoto.success) {
+    nextErrors[`${EMPLOYEE_FIELD_PREFIX}.photo`] =
+      parsedPhoto.error.issues[0]?.message ?? "Archivo no válido."
   }
 
-  const nextErrors: Record<string, string> = {}
+  if (!person) {
+    return nextErrors
+  }
+
   const parsed = employeePersonSchema.safeParse({ person, confirmPassword })
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
@@ -399,9 +411,9 @@ export function ManageEmployeeDialog({
 
   useEffect(() => {
     if (Object.keys(personErrors).length === 0) return
-    setPersonErrors(computePersonErrors(person, confirmPassword))
+    setPersonErrors(computePersonErrors(person, confirmPassword, photo))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `personErrors` es guard, no dep.
-  }, [person, confirmPassword])
+  }, [person, confirmPassword, photo])
 
   function applyLoadedEmployee(employee: Employee) {
     // El backend nunca devuelve la contraseña (`use-employee.ts` la manda
@@ -535,7 +547,7 @@ export function ManageEmployeeDialog({
       return
     }
 
-    const nextPersonErrors = computePersonErrors(draft, confirmPassword)
+    const nextPersonErrors = computePersonErrors(draft, confirmPassword, photo)
     const nextFieldErrors: { establishment?: string } = {}
     if (!establishment) {
       nextFieldErrors.establishment = "Selecciona el establecimiento."
@@ -843,6 +855,14 @@ export function ManageEmployeeDialog({
             onConfirmPasswordChange={setConfirmPassword}
             photo={photo}
             onPhotoChange={setPhoto}
+            // Borrar la foto YA guardada: el form limpia
+            // `person.photoArchivoId` (la vista previa desaparece y el
+            // mock deja de persistirla) y acá se descarta cualquier
+            // archivo que hubiera quedado en cola. En backend real el
+            // borrado todavía no se puede persistir:
+            // `PUT /funcionarios/:ID` (`pigse.fn_fun_actualizar`,
+            // V257/V369) no declara ningún bind de foto — ver `update.ts`.
+            onRemovePhoto={() => setPhoto(null)}
             onMatched={(found) => {
               setMatchedFuncionarioId(found?.id ?? null)
             }}

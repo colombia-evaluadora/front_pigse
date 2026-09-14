@@ -23,6 +23,7 @@ import type { CatalogItem } from "@/types/catalog"
 import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
 import { findPersonByDocument } from "@/features/establishment/employees/api/query/use-user-by-document"
 import type { Person } from "@/features/establishment/employees/api/types/person"
+import { passwordRules } from "@/features/auth/api/schema"
 
 type EmployeeRoleCode = (typeof EMPLOYEE_ROLES)[number]["code"]
 
@@ -68,6 +69,12 @@ interface UserFormProps {
   photo?: File | null
   onPhotoChange?: (file: File | null) => void
   /**
+   * Se dispara cuando el usuario borra la foto YA guardada (la X sobre la
+   * vista previa). El form solo limpia `photoArchivoId` para que la vista
+   * previa desaparezca; persistir el borrado es cosa del padre.
+   */
+  onRemovePhoto?: () => void
+  /**
    * Se dispara con el patch crudo que devolvió `findPersonByDocument`
    * (antes de mezclarlo con `PASSWORD_PLACEHOLDER`) cada vez que el
    * autocompletado encuentra o pierde una coincidencia — `null` cuando el
@@ -109,6 +116,7 @@ export function UserDetailsForm({
   onConfirmPasswordChange,
   photo: photoProp,
   onPhotoChange,
+  onRemovePhoto,
   onMatched,
 }: UserFormProps) {
   // El encabezado solo nombra el rol de la persona (Rector, Secretaria). Sin
@@ -180,6 +188,13 @@ export function UserDetailsForm({
   const isInvalid = (field: string) => showValidation && invalidFields.includes(field)
   // Mensaje debajo del campo: solo tras el primer submit, igual que el borde rojo.
   const errorFor = (field: string) => (showValidation ? errors[field] : undefined)
+  // Guía en vivo: qué requisito falta mientras se escribe una contraseña
+  // nueva, antes de intentar guardar — fuente única `passwordRules`
+  // (`auth/api/schema.ts`).
+  const passwordHint =
+    !person.accountExists && person.password.length > 0
+      ? passwordRules.find((rule) => !rule.test(person.password))?.message
+      : undefined
 
   const emitChange = (patch: Partial<Person>) => {
     onChange({ ...person, ...patch })
@@ -201,17 +216,35 @@ export function UserDetailsForm({
   const isUserEditingDocument = useRef(false)
   useEffect(() => {
     if (!documentTypeId || !identification.trim()) return
+    // Abrir "editar" carga una persona que ya tiene cuenta sin que nadie
+    // haya tecleado: sin este guard el efecto tomaba el reset de abajo por
+    // un cambio de documento y borraba el registro recién cargado.
+    if (person.accountExists && !isUserEditingDocument.current) return
 
     // Reset optimista: en cuanto el documento cambia, ya no se puede
     // asumir que sigue siendo la cuenta (ni, si la había, el
     // TFUNCIONARIO ni la foto) que encontró la búsqueda anterior — se
-    // desbloquea la contraseña y se limpia el `id`/`photoArchivoId`
+    // desbloquea la contraseña y se limpian TODOS los datos personales
     // heredados del match previo, y el lookup de abajo los vuelve a
     // completar solo si el documento nuevo también coincide con una
     // cuenta real. Sin este reset, cambiar de documento hacia una
-    // persona SIN foto seguía mostrando la foto de la persona anterior.
+    // persona SIN foto seguía mostrando la foto de la persona anterior,
+    // y los nombres/fecha/género del match viejo quedaban pegados.
     if (person.accountExists) {
-      emitChange({ accountExists: false, password: "", id: undefined, photoArchivoId: null })
+      emitChange({
+        accountExists: false,
+        password: "",
+        id: undefined,
+        photoArchivoId: null,
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        secondLastName: "",
+        birthDate: "",
+        gender: null,
+        phone: "",
+        email: "",
+      })
       setConfirmPassword("")
       onMatched?.(null)
       setAccountNotice(null)
@@ -286,6 +319,14 @@ export function UserDetailsForm({
               <ArchivoImage archivoId={person.photoArchivoId} alt="Foto de perfil" />
             )
           }
+          onRemoveExisting={
+            person.photoArchivoId == null
+              ? undefined
+              : () => {
+                  emitChange({ photoArchivoId: null })
+                  onRemovePhoto?.()
+                }
+          }
         />
         {/* Formulario */}
 
@@ -302,9 +343,13 @@ export function UserDetailsForm({
             aria-invalid={isInvalid(`${fieldPrefix}.documentType`)}
             value={person.documentType?.id ?? null}
             onValueChange={(selectedValue) => {
+              isUserEditingDocument.current = true
+              if (selectedValue === null) {
+                emitChange({ documentType: null })
+                return
+              }
               const option = documentTypes.find((item) => item.id === selectedValue)
               if (option) {
-                isUserEditingDocument.current = true
                 emitChange({ documentType: option })
               }
             }}
@@ -313,6 +358,7 @@ export function UserDetailsForm({
               <ComboboxFieldValue placeholder="Seleccionar" />
             </ComboboxFieldTrigger>
             <ComboboxFieldContent>
+              <ComboboxFieldItem value={null}>Ninguno</ComboboxFieldItem>
               {documentTypes.map((item) => (
                 <ComboboxFieldItem key={item.id} value={item.id} title={item.name}>
                   {item.name}
@@ -338,14 +384,16 @@ export function UserDetailsForm({
             placeholder="Agregar"
             // TUSUARIO.IDENTIFICACION es VARCHAR(30) puramente
             // numérico (RegisterUsuarioRequest la valida igual,
-            // @Size(max=30)) — solo dígitos, sin letras.
+            // @Size(max=30)) — solo dígitos, sin letras. Acotado a 11
+            // acá: ningún documento colombiano (CC, TI, CE, NIT de
+            // persona) supera esa longitud.
             inputMode="numeric"
-            maxLength={30}
+            maxLength={11}
             value={person.identification}
             aria-invalid={isInvalid(`${fieldPrefix}.identification`)}
             onChange={(event) => {
               isUserEditingDocument.current = true
-              emitChange({ identification: toDigitsOnly(event.target.value, 30) })
+              emitChange({ identification: toDigitsOnly(event.target.value, 11) })
             }}
           />
           <FieldError>{errorFor(`${fieldPrefix}.identification`)}</FieldError>
@@ -364,7 +412,7 @@ export function UserDetailsForm({
             placeholder="Agregar"
             value={person.firstName}
             aria-invalid={isInvalid(`${fieldPrefix}.firstName`)}
-            onChange={(event) => emitChange({ firstName: event.target.value })}
+            onChange={(event) => emitChange({ firstName: event.target.value.toUpperCase() })}
           />
           <FieldError>{errorFor(`${fieldPrefix}.firstName`)}</FieldError>
         </Field>
@@ -376,7 +424,7 @@ export function UserDetailsForm({
             size="sm"
             placeholder="Agregar"
             value={person.middleName ?? ""}
-            onChange={(event) => emitChange({ middleName: event.target.value })}
+            onChange={(event) => emitChange({ middleName: event.target.value.toUpperCase() })}
           />
         </Field>
 
@@ -393,7 +441,7 @@ export function UserDetailsForm({
             placeholder="Agregar"
             value={person.lastName}
             aria-invalid={isInvalid(`${fieldPrefix}.lastName`)}
-            onChange={(event) => emitChange({ lastName: event.target.value })}
+            onChange={(event) => emitChange({ lastName: event.target.value.toUpperCase() })}
           />
           <FieldError>{errorFor(`${fieldPrefix}.lastName`)}</FieldError>
         </Field>
@@ -405,7 +453,9 @@ export function UserDetailsForm({
             size="sm"
             placeholder="Agregar"
             value={person.secondLastName ?? ""}
-            onChange={(event) => emitChange({ secondLastName: event.target.value })}
+            onChange={(event) =>
+              emitChange({ secondLastName: event.target.value.toUpperCase() })
+            }
           />
         </Field>
       </div>
@@ -416,7 +466,7 @@ export function UserDetailsForm({
           className="w-full"
           data-invalid={isInvalid(`${fieldPrefix}.email`) ? "true" : undefined}
         >
-          <FieldLabel htmlFor="user-email">Correo Electrónico</FieldLabel>
+          <FieldLabel htmlFor="user-email">Correo Electrónico{required ? "*" : ""}</FieldLabel>
           <Input
             id="user-email"
             size="sm"
@@ -434,7 +484,7 @@ export function UserDetailsForm({
           data-invalid={isInvalid(`${fieldPrefix}.password`) ? "true" : undefined}
         >
           <FieldLabel htmlFor="user-password">
-            Contraseña
+            Contraseña{required ? "*" : ""}
             {person.accountExists ? " (cuenta existente)" : ""}
           </FieldLabel>
           <Input
@@ -465,7 +515,10 @@ export function UserDetailsForm({
             aria-invalid={isInvalid(`${fieldPrefix}.password`)}
             onChange={(event) => emitChange({ password: event.target.value })}
           />
-          <FieldError>{errorFor(`${fieldPrefix}.password`)}</FieldError>
+          {/* Guía en vivo: qué requisito falta mientras se escribe
+              una contraseña nueva, antes de intentar guardar —
+              fuente única `passwordRules` (`auth/api/schema.ts`). */}
+          <FieldError>{errorFor(`${fieldPrefix}.password`) ?? passwordHint}</FieldError>
         </Field>
         <Field
           orientation="vertical"
@@ -473,7 +526,9 @@ export function UserDetailsForm({
           className="w-full"
           data-invalid={isInvalid(`${fieldPrefix}.confirmPassword`) ? "true" : undefined}
         >
-          <FieldLabel htmlFor="user-confirm-password">Confirmar Contraseña</FieldLabel>
+          <FieldLabel htmlFor="user-confirm-password">
+            Confirmar Contraseña{required ? "*" : ""}
+          </FieldLabel>
           <Input
             id="user-confirm-password"
             size="sm"
@@ -489,7 +544,16 @@ export function UserDetailsForm({
             aria-invalid={isInvalid(`${fieldPrefix}.confirmPassword`)}
             onChange={(event) => setConfirmPassword(event.target.value)}
           />
-          <FieldError>{errorFor(`${fieldPrefix}.confirmPassword`)}</FieldError>
+          {/* Mismatch en vivo, pegado al campo que corrige — antes
+              vivía como párrafo suelto al final del formulario,
+              lejos de "Contraseña"/"Confirmar" y sin relación
+              visual con ellos. */}
+          <FieldError>
+            {errorFor(`${fieldPrefix}.confirmPassword`) ??
+              (!passwordsMatch && person.password.length > 0 && confirmPassword.length > 0
+                ? "Las contraseñas no coinciden."
+                : undefined)}
+          </FieldError>
         </Field>
       </div>
       <div className="grid grid-cols-1 gap-x-4 gap-y-2 md:grid-cols-3">
@@ -503,6 +567,8 @@ export function UserDetailsForm({
             id="birth-date"
             mode="date"
             size="sm"
+            // No tiene sentido nacer en el futuro.
+            maxDate={new Date()}
             value={parseDateValue(person.birthDate)}
             aria-invalid={isInvalid(`${fieldPrefix}.birthDate`)}
             onChange={(date) =>
@@ -516,7 +582,7 @@ export function UserDetailsForm({
           variant="outlined"
           data-invalid={isInvalid(`${fieldPrefix}.gender`) ? "true" : undefined}
         >
-          <FieldLabel htmlFor="gender-user">Género*</FieldLabel>
+          <FieldLabel htmlFor="gender-user">Género{required ? "*" : ""}</FieldLabel>
           <ComboboxField
             id="gender-user"
             items={genderLabels}
@@ -564,9 +630,6 @@ export function UserDetailsForm({
           />
         </Field>
       </div>
-      {!passwordsMatch && person.password.length > 0 && confirmPassword.length > 0 ? (
-        <p className="text-sm text-destructive">Las contraseñas no coinciden.</p>
-      ) : null}
     </div>
   )
 }
