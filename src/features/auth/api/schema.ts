@@ -126,3 +126,11 @@ export const restorePasswordSearchSchema = z.object({
   token: z.string().optional(),
 })
 export type RestorePasswordSearch = z.infer<typeof restorePasswordSearchSchema>
+
+// Activación de cuenta: mismas reglas de contraseña que restaurar, así que
+// reutiliza restorePasswordFormSchema tal cual (el form también es el
+// mismo componente) — solo cambia a qué endpoint se postea el valor.
+export const activateSearchSchema = z.object({
+  token: z.string().optional(),
+})
+export type ActivateSearch = z.infer<typeof activateSearchSchema>

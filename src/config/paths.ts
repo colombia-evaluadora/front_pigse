@@ -28,6 +28,15 @@ export const paths = {
       getHref: (token?: string | null) =>
         `/restore-password${token ? `?token=${encodeURIComponent(token)}` : ""}`,
     },
+    // Destino del enlace de "Activa tu cuenta" (creación de cuenta por un
+    // administrador) — mismo patrón que restorePassword, contra
+    // /activationTokenStatus y /activateAccount en vez de sus pares de
+    // restore.
+    activate: {
+      path: "/activate",
+      getHref: (token?: string | null) =>
+        `/activate${token ? `?token=${encodeURIComponent(token)}` : ""}`,
+    },
   },
 
   app: {

@@ -266,3 +266,63 @@ export function setUserPassword(email: string, password: string) {
   const user = findUserByEmail(email)
   if (user) user.password = password
 }
+
+// Mismo patrón que el bloque de arriba (token estático, mapa por token, no
+// se consume al usarlo) para el flujo de activación — la única diferencia
+// real con "recuperar contraseña" es qué endpoint dispara el token
+// (`createAccount`/`resendActivation`, ninguno mockeado hoy) y a qué status
+// consulta la pantalla (`/activationTokenStatus`, no `/resetTokenStatus`).
+export const MOCK_ACTIVATION_TOKEN = "mock-activation-token"
+export const ACCOUNT_ACTIVATION_TTL_SECONDS = 30 * 60
+
+const activationTokens = new Map<string, PasswordResetEntry>([
+  [
+    MOCK_ACTIVATION_TOKEN,
+    {
+      email: authUsers[0].email,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + ACCOUNT_ACTIVATION_TTL_SECONDS * 1000,
+    },
+  ],
+])
+
+export function getActivationTokenStatus(token: string): {
+  status: PasswordResetTokenStatus
+  expiresIn: number
+  ttlSeconds: number
+  maskedEmail?: string
+  issuedAt?: number
+} {
+  const entry = activationTokens.get(token)
+  if (!entry) {
+    return {
+      status: "invalid",
+      expiresIn: 0,
+      ttlSeconds: ACCOUNT_ACTIVATION_TTL_SECONDS,
+    }
+  }
+
+  const remaining = Math.max(0, Math.ceil((entry.expiresAt - Date.now()) / 1000))
+  return {
+    status: remaining > 0 ? "valid" : "expired",
+    expiresIn: remaining,
+    ttlSeconds: ACCOUNT_ACTIVATION_TTL_SECONDS,
+    maskedEmail: maskEmail(entry.email),
+    issuedAt: entry.issuedAt,
+  }
+}
+
+export function consumeActivationToken(token: string): {
+  email?: string
+  status: PasswordResetTokenStatus
+} {
+  const { status } = getActivationTokenStatus(token)
+  if (status !== "valid") return { status }
+  return { email: activationTokens.get(token)!.email, status }
+}
+
+/** Activar la cuenta también le pone la contraseña por primera vez. */
+export function activateUserAccount(email: string, password: string) {
+  const user = findUserByEmail(email)
+  if (user) user.password = password
+}
