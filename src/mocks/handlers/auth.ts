@@ -1,6 +1,8 @@
 import { http, HttpResponse, delay } from "msw"
 
 import {
+  activateUserAccount,
+  consumeActivationToken,
   consumePasswordResetToken,
   createMockAccessToken,
   createPasswordResetToken,
@@ -8,6 +10,7 @@ import {
   findUserByCredentials,
   findUserByDocument,
   findUserByEmail,
+  getActivationTokenStatus,
   getPasswordResetTokenStatus,
   setUserPassword,
 } from "@/mocks/db/auth"
@@ -189,6 +192,39 @@ export const authHandlers = [
     }
 
     setUserPassword(email, password)
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  // Estado del enlace de activación — mismo motivo que resetTokenStatus,
+  // sobre el mapa de tokens de activación en vez del de reseteo. Para
+  // probar la pantalla en dev, navegar a /activate?token=mock-activation-token.
+  http.get("/api/sso-admin/activationTokenStatus", ({ request }) => {
+    const token = new URL(request.url).searchParams.get("token") ?? ""
+    return HttpResponse.json(getActivationTokenStatus(token))
+  }),
+
+  http.post("/api/sso-admin/activateAccount", async ({ request }) => {
+    await delay(300)
+    const { token, password } = (await request.json()) as {
+      token: string
+      password: string
+    }
+    const { email, status } = consumeActivationToken(token)
+
+    if (!email) {
+      return HttpResponse.json(
+        {
+          code: status,
+          message:
+            status === "expired"
+              ? "El enlace de activación ya expiró. Contacta a tu administrador."
+              : "El enlace de activación no es válido.",
+        },
+        { status: 400 },
+      )
+    }
+
+    activateUserAccount(email, password)
     return new HttpResponse(null, { status: 200 })
   }),
 ]
