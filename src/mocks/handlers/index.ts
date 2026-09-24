@@ -8,6 +8,7 @@ import { plansHandlers } from "@/mocks/handlers/plans"
 import { reportesHandlers } from "@/mocks/handlers/reportes"
 import { documentHandlers } from "@/mocks/handlers/documents"
 import { complianceHandlers } from "@/mocks/handlers/compliance"
+import { userActivityHandlers } from "@/mocks/handlers/user-activity"
 
 export const handlers = [
   ...authHandlers,
@@ -20,4 +21,5 @@ export const handlers = [
   ...plansHandlers,
   ...documentHandlers,
   ...complianceHandlers,
+  ...userActivityHandlers,
 ]
