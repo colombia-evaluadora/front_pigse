@@ -142,5 +142,18 @@ export const paths = {
       path: "registro-de-actividad/tablas/$tableSlug",
       getHref: (tableSlug: string) => `/app/registro-de-actividad/tablas/${tableSlug}`,
     },
+    /**
+     * Actividad de usuarios: listado de funcionarios (rectores y
+     * secretarios) que ya usaron la plataforma, con su último ingreso y un
+     * badge de estado (`EN_LINEA`/`DESCONECTADO`/`SIN_INGRESO`). Pensada
+     * para la secretaría territorial — ver `USER_ACTIVITY_VIEWERS` en
+     * `lib/auth-routes.ts` para los roles habilitados. Vive fuera del
+     * grupo "Registro de actividad" (auditoría de cambios en BD): es otro
+     * dominio, aunque comparta la sección "Administración" del menú.
+     */
+    actividadUsuarios: {
+      path: "actividad-usuarios",
+      getHref: () => "/app/actividad-usuarios",
+    },
   },
 } as const
