@@ -35,6 +35,7 @@ import {
   sessionOperationsSearchSchema,
   tableOperationsSearchSchema,
 } from "@/features/administration/audits/api/schema"
+import { userActivitySearchSchema } from "@/features/administration/user-activity/api/schema"
 
 /*const LandingPage = lazyRouteComponent(
   () => import("@/features/landing/pages/landing-page"),
@@ -97,6 +98,10 @@ const AuditTablesPage = lazyRouteComponent(
 const TableOperationsPage = lazyRouteComponent(
   () => import("@/features/administration/audits/pages/table-operations-page"),
   "TableOperationsPage",
+)
+const UserActivityPage = lazyRouteComponent(
+  () => import("@/features/administration/user-activity/pages/user-activity-page"),
+  "UserActivityPage",
 )
 const SessionOperationsPage = lazyRouteComponent(
   () => import("@/features/administration/audits/pages/session-operations-page"),
@@ -334,6 +339,16 @@ export const rolesMenusRoute = createRoute({
   component: RolesMenusPage,
 })
 
+export const actividadUsuariosRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: paths.app.actividadUsuarios.path,
+  validateSearch: userActivitySearchSchema,
+  staticData: {
+    breadcrumb: [ADMINISTRACION_CRUMB, { label: "Actividad de usuarios" }],
+  },
+  component: UserActivityPage,
+})
+
 // Mismo criterio que `_establishment`: las cuatro vistas de auditoría
 // comparten un `NoticeProvider` para que el aviso de una exportación o de un
 // revert siga visible al moverse entre ellas.
@@ -515,6 +530,7 @@ const routeTree = rootRoute.addChildren([
   appLayoutRoute.addChildren([
     appIndexRoute,
     rolesMenusRoute,
+    actividadUsuariosRoute,
     auditsLayoutRoute.addChildren([
       auditoriaSesionesRoute,
       auditoriaTablasRoute,

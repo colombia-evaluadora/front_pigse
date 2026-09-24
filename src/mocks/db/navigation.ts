@@ -89,6 +89,20 @@ export const navigationMenu: MockMenu[] = [
     maxLines: 2,
   },
   {
+    id: 107,
+    name: "Actividad de usuarios",
+    icon: "",
+    path: "/app/actividad-usuarios",
+    menuOrder: 2,
+    type: "ITEM",
+    idParent: 100,
+    // PIGSE-ADMINISTRADOR, PIGSE-SECRETARIA_TERRITORIAL, PIGSE-SECRETARIO,
+    // PIGSE-JEFE_AREA_CALIDAD, PIGSE-JEFE_AREA_PLANEACION,
+    // PIGSE-JEFE_AREA_COBERTURA (mismos 6 roles que acepta V495 en el back,
+    // ver USER_ACTIVITY_VIEWERS en lib/auth-routes.ts)
+    roleIds: [840, 839, 841, 834, 831, 838],
+  },
+  {
     id: 103,
     name: "Establecimiento Educativo",
     icon: "Bank-Icon",

@@ -54,6 +54,21 @@ export const COMPLIANCE_VIEWERS = [
   PIGSE_ROLES.JefeSistemaEnteTerritorial,
 ] as const
 
+/**
+ * Roles que pueden ver "Actividad de usuarios"
+ * (`POST /pigse/usuarios/actividad/query`, V495). Espejo exacto de los
+ * roles que acepta el backend para esa query — otro rol responde 403 (sin
+ * fila en `role_query`, el gate PL/pgSQL también da 42501).
+ */
+export const USER_ACTIVITY_VIEWERS = [
+  PIGSE_ROLES.SecretariaTerritorial,
+  PIGSE_ROLES.Secretario,
+  PIGSE_ROLES.JefeAreaCalidad,
+  PIGSE_ROLES.JefeAreaPlaneacion,
+  PIGSE_ROLES.JefeAreaCobertura,
+  PIGSE_ROLES.Administrador,
+] as const
+
 interface AccessRule {
   prefix: string
   allowedRoles: readonly string[]
@@ -64,6 +79,7 @@ const ROUTE_ACCESS: AccessRule[] = [
   { prefix: "/establecimiento-educativo", allowedRoles: [PIGSE_ROLES.Administrador] },
   { prefix: "/gestion-documental", allowedRoles: DOCUMENT_READERS },
   { prefix: "/monitoreo-cumplimiento", allowedRoles: COMPLIANCE_VIEWERS },
+  { prefix: "/actividad-usuarios", allowedRoles: USER_ACTIVITY_VIEWERS },
   // El visor no es ítem de menú: lo abren tanto "Gestión documental" (al
   // Consultar un documento) como "Monitoreo y cumplimiento" (al clickear el
   // dot verde de un EE). Por eso acepta la unión de los dos conjuntos.
