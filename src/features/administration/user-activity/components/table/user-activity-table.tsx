@@ -20,7 +20,7 @@ import { SearchUserActivity } from "@/features/administration/user-activity/comp
 /**
  * "Actividad de usuarios": una fila por (establecimiento, usuario PIGSE
  * activo) con su último ingreso/actividad y un badge de estado
- * (`EN_LINEA`/`DESCONECTADO`/`SIN_INGRESO`). Solo lectura — no hay
+ * (`CON_INGRESO`/`SIN_INGRESO`). Solo lectura — no hay
  * selección ni export, a diferencia de las tablas de auditoría, porque acá
  * no hay nada que exportar todavía (ver `use-user-activity-query.ts`).
  */

@@ -7,13 +7,11 @@ interface BadgeProps {
 }
 
 export const USER_ACTIVITY_STATUS_LABELS: Record<UserActivityStatus, string> = {
-  EN_LINEA: "En línea",
-  DESCONECTADO: "Desconectado",
+  CON_INGRESO: "Con ingreso",
   SIN_INGRESO: "Sin ingreso",
 }
 
 export const USER_ACTIVITY_STATUS_BADGE: Record<UserActivityStatus, BadgeProps> = {
-  EN_LINEA: { variant: "soft", color: "success" },
-  DESCONECTADO: { variant: "soft", color: "secondary" },
+  CON_INGRESO: { variant: "soft", color: "success" },
   SIN_INGRESO: { variant: "soft", color: "muted" },
 }
