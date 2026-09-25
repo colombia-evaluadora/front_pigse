@@ -36,6 +36,10 @@ import {
   tableOperationsSearchSchema,
 } from "@/features/administration/audits/api/schema"
 import { userActivitySearchSchema } from "@/features/administration/user-activity/api/schema"
+import {
+  getFirstNavUrl,
+  navItemsQueryOptions,
+} from "@/features/navigation/api/query/use-nav-items-query"
 
 /*const LandingPage = lazyRouteComponent(
   () => import("@/features/landing/pages/landing-page"),
@@ -315,18 +319,29 @@ const MONITOREO_CRUMB = {
   to: paths.app.gestionDocumental.getHref(),
 }
 
-// `/app` no tiene página propia: manda a la primera ruta que el rol del
-// usuario pueda ver. Para el Administrador era `monitoreo-cumplimiento`
-// cuando ese era el único ítem del grupo "Monitoreo"; ahora se resuelve
-// dinámicamente para que un Rector (que no ve "Monitoreo y cumplimiento")
-// aterrice directamente en "Gestión documental", sin tener que pegar el
-// rebote de "no autorizado" del layout.
+// `/app` no tiene página propia: manda a la primera ruta que el sidebar del
+// usuario trae realmente (`getFirstNavUrl`), no a la del primer PREFIJO de
+// `findFirstAllowedPath` — ese mapa solo sabe qué prefijo autoriza un rol,
+// y algunos prefijos (ej. "/administracion") son el path de un GRUPO sin
+// pantalla propia, no de una ruta real: mandar ahí de una dejaba a
+// cualquier Administrador en "Página no encontrada" en cada login
+// (reportado en vivo). Los grupos del sidebar ya heredan la ruta de su
+// primer hijo (`toNavItemDtos`), así que el primer item del menú siempre es
+// navegable. `findFirstAllowedPath` queda como respaldo si el menú vino
+// vacío o la consulta falla (misma sesión, sin roles cargados todavía).
 const appIndexRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/",
-  beforeLoad: ({ context }) => {
+  beforeLoad: async ({ context }) => {
     const user = context.queryClient.getQueryData<AuthUser>(USER_QUERY_KEY) ?? null
-    throw redirect({ to: findFirstAllowedPath(user) })
+    let firstUrl: string | null = null
+    try {
+      const items = await context.queryClient.ensureQueryData(navItemsQueryOptions)
+      firstUrl = getFirstNavUrl(items)
+    } catch {
+      firstUrl = null
+    }
+    throw redirect({ to: firstUrl ?? findFirstAllowedPath(user) })
   },
 })
 
