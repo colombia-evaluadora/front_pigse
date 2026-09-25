@@ -1,12 +1,12 @@
 /**
  * `estado` lo deriva el backend a partir de `academico_test.tsesion_web`
- * (V495, `POST /pigse/usuarios/actividad/query`): `EN_LINEA` = sesión abierta
- * con actividad en los últimos 30 min (misma regla que `/audits/query`),
- * `DESCONECTADO` = tuvo sesión alguna vez, `SIN_INGRESO` = nunca inició
- * sesión. Las sesiones se recolectan a los 40 días de cerradas, así que un
- * usuario inactivo por más tiempo vuelve a `SIN_INGRESO`.
+ * (V495/V500, `POST /pigse/usuarios/actividad/query`): `CON_INGRESO` = el
+ * usuario tiene al menos una sesión registrada, `SIN_INGRESO` = nunca inició
+ * sesión. No distingue "en línea ahora" — V500 sacó `EN_LINEA`/
+ * `DESCONECTADO` del contrato real (la ventana de 30 min resultó no ser lo
+ * que pedía el negocio); ver `pigse.fn_usuarios_actividad_listar_interno`.
  */
-export const USER_ACTIVITY_STATUSES = ["EN_LINEA", "DESCONECTADO", "SIN_INGRESO"] as const
+export const USER_ACTIVITY_STATUSES = ["CON_INGRESO", "SIN_INGRESO"] as const
 export type UserActivityStatus = (typeof USER_ACTIVITY_STATUSES)[number]
 
 /** Una fila por (establecimiento, usuario PIGSE activo). */
@@ -23,6 +23,5 @@ export interface UserActivityRow {
   roles: string
   ultimoLogin: string | null
   ultimaActividad: string | null
-  enLinea: boolean
   estado: UserActivityStatus
 }

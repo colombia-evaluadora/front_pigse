@@ -41,7 +41,7 @@ const ESTADO_ITEMS = toSelectItemsMap(
 /**
  * Filtros avanzados de "Actividad de usuarios": Establecimiento (todo PIGSE,
  * sin acotar al del usuario que consulta — los 6 roles habilitados ven todo)
- * y Estado (`EN_LINEA` / `DESCONECTADO` / `SIN_INGRESO`, ver
+ * y Estado (`CON_INGRESO` / `SIN_INGRESO`, ver
  * `USER_ACTIVITY_STATUSES`). El buscador de texto libre vive en la barra,
  * afuera de este form (mismo criterio que `FilterAuditSessionForm`).
  */
