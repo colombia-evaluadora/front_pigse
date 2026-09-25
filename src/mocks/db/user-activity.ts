@@ -8,21 +8,13 @@ faker.seed(20260924)
 const ROLE_SETS = ["PIGSE-RECTOR", "PIGSE-SECRETARIO", "PIGSE-RECTOR, PIGSE-SECRETARIO"]
 
 function randomStatus(): UserActivityRow["estado"] {
-  const roll = faker.number.int({ min: 1, max: 100 })
-  if (roll <= 20) return "EN_LINEA"
-  if (roll <= 75) return "DESCONECTADO"
-  return "SIN_INGRESO"
+  return faker.number.int({ min: 1, max: 100 }) <= 70 ? "CON_INGRESO" : "SIN_INGRESO"
 }
 
 function createUserActivityRow(usuarioId: number, establecimiento: { id: number; name: string }): UserActivityRow {
   const estado = randomStatus()
   const ultimoLogin = estado === "SIN_INGRESO" ? null : faker.date.recent({ days: 90 }).toISOString()
-  const ultimaActividad =
-    estado === "EN_LINEA"
-      ? faker.date.recent({ days: 0.02 }).toISOString()
-      : estado === "DESCONECTADO"
-        ? ultimoLogin
-        : null
+  const ultimaActividad = estado === "SIN_INGRESO" ? null : faker.date.recent({ days: 30 }).toISOString()
 
   return {
     establecimientoId: establecimiento.id,
@@ -35,7 +27,6 @@ function createUserActivityRow(usuarioId: number, establecimiento: { id: number;
     roles: faker.helpers.arrayElement(ROLE_SETS),
     ultimoLogin,
     ultimaActividad,
-    enLinea: estado === "EN_LINEA",
     estado,
   }
 }
