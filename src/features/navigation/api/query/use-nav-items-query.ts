@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { queryOptions, useQuery } from "@tanstack/react-query"
 
 import { pigse } from "@/lib/pigse-client"
 import { toNavItemDtos } from "@/features/navigation/api/menu-mapper"
@@ -47,10 +47,28 @@ async function fetchNavItems(): Promise<NavItem[]> {
   }))
 }
 
+export const navItemsQueryOptions = queryOptions({
+  queryKey: ["navigation", "menu"],
+  queryFn: fetchNavItems,
+  staleTime: Infinity,
+})
+
 export function useNavItemsQuery() {
-  return useQuery({
-    queryKey: ["navigation", "menu"],
-    queryFn: fetchNavItems,
-    staleTime: Infinity,
-  })
+  return useQuery(navItemsQueryOptions)
+}
+
+/**
+ * Primera pantalla a la que puede entrar el usuario: la del primer item del
+ * sidebar, en el mismo orden en que se pinta. Sirve para resolver `/app`
+ * (`appIndexRoute`) SIN depender de `findFirstAllowedPath` (`lib/
+ * auth-routes.ts`), que solo conoce PREFIJOS de acceso — algunos (como
+ * "/administracion") son el path de un GRUPO sin ruta propia, no de una
+ * pantalla real, y mandar ahí de una devolvía "Página no encontrada" en
+ * cada login para cualquier Administrador (reportado en vivo). Los grupos
+ * ya heredan la ruta de su primer hijo en `toNavItemDtos`, así que el `url`
+ * del primer item siempre es navegable. `null` si el menú vino vacío.
+ * Mismo criterio que `getFirstNavUrl` en front_colombia_evaluadora.
+ */
+export function getFirstNavUrl(items: NavItem[]): string | null {
+  return items[0]?.url ?? null
 }
