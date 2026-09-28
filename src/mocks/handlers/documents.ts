@@ -2,18 +2,33 @@ import { delay, http, HttpResponse } from "msw"
 
 import {
   documentsDb,
+  documentCategoriesDb,
   findDocumentByType,
+  findDocumentCategory,
+  listDocumentCategories,
   uploadDocumentVersion,
   deleteCurrentDocumentVersion,
+  uploadDocumentCategoryVersion,
+  deleteDocumentCategoryVersion,
 } from "@/mocks/db/documents"
 
-import type { DocumentType } from "@/features/document-management/api/types/document"
-import type { DocumentMutationResult } from "@/features/document-management/api/types/document"
+import { DOCUMENT_CATEGORIES } from "@/features/document-management/api/types/document"
+import type {
+  DocumentCategoryCode,
+  DocumentCategoryMutationResult,
+  DocumentMutationResult,
+  DocumentType,
+} from "@/features/document-management/api/types/document"
 
 const DOCUMENT_TYPE_SET: ReadonlySet<string> = new Set(["PEI", "PEC", "PMI"])
+const DOCUMENT_CATEGORY_SET: ReadonlySet<string> = new Set(DOCUMENT_CATEGORIES)
 
 function isDocumentType(value: string): value is DocumentType {
   return DOCUMENT_TYPE_SET.has(value)
+}
+
+function isDocumentCategoryCode(value: string): value is DocumentCategoryCode {
+  return DOCUMENT_CATEGORY_SET.has(value)
 }
 
 /**
@@ -32,9 +47,13 @@ async function readUploadBody(request: Request) {
     // para que el mock siga sirviendo a los tests viejos.
     const tipo = form.get("TIPO") ?? form.get("tipo")
     const archivo = form.get("ARCHIVO") ?? form.get("archivo")
+    // V512: opcional a nivel de formulario — la validación de "obligatoria
+    // para PEI/PEC" vive en el handler, igual que en `fn_documento_guardar`.
+    const categoria = form.get("CATEGORIA") ?? form.get("categoria")
     return {
       tipo: typeof tipo === "string" ? tipo : null,
       archivo: archivo instanceof File ? archivo : null,
+      categoria: typeof categoria === "string" && categoria ? categoria : null,
     }
   } catch {
     return { tipo: null, archivo: null }
@@ -87,6 +106,18 @@ function buildMockPdf(texto: string): string {
   return pdf
 }
 
+/**
+ * Un `archivoId` puede pertenecer a un documento de un solo archivo (PMI) o
+ * a un anexo de PEI/PEC (V512) — los handlers de archivo no necesitan saber
+ * cuál, solo el `fileName` para armar el PDF de prueba.
+ */
+function findFileByArchivoId(archivoId: string | undefined): { fileName: string | null } | undefined {
+  return (
+    documentsDb.find((d) => String(d.archivoId) === String(archivoId)) ??
+    documentCategoriesDb.find((c) => String(c.archivoId) === String(archivoId))
+  )
+}
+
 export const documentHandlers = [
   /**
    * Acuña el token de vista. El backend real devuelve `{ token, url }` donde
@@ -96,7 +127,7 @@ export const documentHandlers = [
   http.post("*/api/files/view-token/:archivoId", async ({ params }) => {
     await delay(150)
     const archivoId = Array.isArray(params.archivoId) ? params.archivoId[0] : params.archivoId
-    const documento = documentsDb.find((d) => String(d.archivoId) === String(archivoId))
+    const documento = findFileByArchivoId(archivoId)
 
     if (!documento?.fileName) {
       return HttpResponse.json({ message: "Archivo no encontrado." }, { status: 404 })
@@ -114,7 +145,7 @@ export const documentHandlers = [
   http.get("*/api/files/view/:archivoId", async ({ params }) => {
     await delay(200)
     const archivoId = Array.isArray(params.archivoId) ? params.archivoId[0] : params.archivoId
-    const documento = documentsDb.find((d) => String(d.archivoId) === String(archivoId))
+    const documento = findFileByArchivoId(archivoId)
 
     if (!documento?.fileName) {
       return HttpResponse.json({ message: "Archivo no encontrado." }, { status: 404 })
@@ -141,7 +172,7 @@ export const documentHandlers = [
     await delay(300)
 
     const archivoId = Array.isArray(params.archivoId) ? params.archivoId[0] : params.archivoId
-    const documento = documentsDb.find((d) => String(d.archivoId) === String(archivoId))
+    const documento = findFileByArchivoId(archivoId)
 
     if (!documento?.fileName) {
       return HttpResponse.json({ message: "Archivo no encontrado." }, { status: 404 })
@@ -182,11 +213,11 @@ export const documentHandlers = [
   http.post("*/api/files/documents/upload", async ({ request }) => {
     await delay(450)
 
-    const { tipo, archivo } = await readUploadBody(request)
+    const { tipo, archivo, categoria } = await readUploadBody(request)
 
     if (!tipo || !isDocumentType(tipo)) {
       return HttpResponse.json(
-        { status: "error", message: "Debe indicar el tipo de documento (PEI o PMI)." },
+        { status: "error", message: "Debe indicar el tipo de documento (PEI, PEC o PMI)." },
         { status: 400 },
       )
     }
@@ -205,15 +236,44 @@ export const documentHandlers = [
       )
     }
 
-    const document = uploadDocumentVersion({
+    // V512: PEI/PEC exigen categoría (uno de los 5 anexos fijos); PMI no
+    // tiene categorías — mismo par de validaciones que `fn_documento_guardar`.
+    if (tipo === "PMI") {
+      if (categoria) {
+        return HttpResponse.json(
+          { status: "error", message: "PMI no tiene categorías." },
+          { status: 400 },
+        )
+      }
+      const document = uploadDocumentVersion({
+        type: "PMI",
+        fileName: archivo.name,
+        sizeBytes: archivo.size,
+      })
+      return HttpResponse.json<DocumentMutationResult>({
+        status: "ok",
+        message: "Documento cargado correctamente.",
+        document,
+      })
+    }
+
+    if (!categoria || !isDocumentCategoryCode(categoria)) {
+      return HttpResponse.json(
+        { status: "error", message: `Debe indicar la categoría del anexo de ${tipo}.` },
+        { status: 400 },
+      )
+    }
+
+    const document = uploadDocumentCategoryVersion({
       type: tipo,
+      categoria,
       fileName: archivo.name,
       sizeBytes: archivo.size,
     })
 
-    return HttpResponse.json<DocumentMutationResult>({
+    return HttpResponse.json<DocumentCategoryMutationResult>({
       status: "ok",
-      message: "Documento cargado correctamente.",
+      message: "Anexo cargado correctamente.",
       document,
     })
   }),
@@ -230,6 +290,16 @@ export const documentHandlers = [
     if (!typeParam || !isDocumentType(typeParam)) {
       return HttpResponse.json(
         { status: "error", message: "Tipo de documento inválido." },
+        { status: 400 },
+      )
+    }
+
+    // V512: PEI/PEC ya no se eliminan por acá (son 5 anexos, no un solo
+    // archivo) — ver el handler de `/documents/:type/categories/:categoria`
+    // más abajo. Esta ruta sigue existiendo solo para PMI.
+    if (typeParam !== "PMI") {
+      return HttpResponse.json(
+        { status: "error", message: `${typeParam} requiere indicar la categoría del anexo a eliminar.` },
         { status: 400 },
       )
     }
@@ -252,6 +322,66 @@ export const documentHandlers = [
     return HttpResponse.json<DocumentMutationResult>({
       status: "ok",
       message: "Documento eliminado.",
+      document,
+    })
+  }),
+
+  /**
+   * Anexos de un PEI/PEC puntual (V512) — las 5 categorías fijas con su
+   * estado y archivo vigente (si lo hay).
+   */
+  http.get("*/api/documents/:type/categories", async ({ params }) => {
+    await delay(200)
+
+    const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
+    if (!typeParam || typeParam === "PMI" || !isDocumentType(typeParam)) {
+      return HttpResponse.json({ message: "Tipo de documento inválido." }, { status: 400 })
+    }
+
+    return HttpResponse.json({ rows: listDocumentCategories(typeParam) })
+  }),
+
+  /**
+   * Elimina la versión vigente de UN anexo de PEI/PEC. Mismo criterio que
+   * el PATCH de arriba: baja lógica, el archivo pasa al historial.
+   */
+  http.patch("*/api/documents/:type/categories/:categoria", async ({ params }) => {
+    await delay(250)
+
+    const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
+    const categoriaParam = Array.isArray(params.categoria) ? params.categoria[0] : params.categoria
+
+    if (!typeParam || typeParam === "PMI" || !isDocumentType(typeParam)) {
+      return HttpResponse.json(
+        { status: "error", message: "Tipo de documento inválido." },
+        { status: 400 },
+      )
+    }
+    if (!categoriaParam || !isDocumentCategoryCode(categoriaParam)) {
+      return HttpResponse.json(
+        { status: "error", message: "Categoría inválida." },
+        { status: 400 },
+      )
+    }
+
+    const existing = findDocumentCategory(typeParam, categoriaParam)
+    if (!existing || existing.status === "PENDIENTE") {
+      return HttpResponse.json(
+        { status: "error", message: "El anexo no tiene una versión vigente para eliminar." },
+        { status: 404 },
+      )
+    }
+
+    const document = deleteDocumentCategoryVersion(typeParam, categoriaParam)
+    if (!document) {
+      return HttpResponse.json(
+        { status: "error", message: "No se pudo eliminar el anexo." },
+        { status: 500 },
+      )
+    }
+    return HttpResponse.json<DocumentCategoryMutationResult>({
+      status: "ok",
+      message: "Anexo eliminado.",
       document,
     })
   }),

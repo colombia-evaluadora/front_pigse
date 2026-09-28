@@ -83,6 +83,80 @@ export interface Document {
    * Mientras no llegue, la pantalla omite el nombre en vez de inventarlo.
    */
   establishmentName?: string | null
+  /**
+   * V512: solo PEI/PEC (`undefined`/`null` en PMI, que no tiene anexos).
+   * PEI/PEC ya NO cuelgan de un archivo propio — `fileName`/`archivoId`/
+   * `downloadUrl` de esta fila quedan siempre `null` — el archivo real vive
+   * en cada uno de sus 5 anexos (`DocumentCategory`, ver
+   * `fn_documento_categorias_listar`). `status` sigue siendo la fuente de
+   * verdad de "completo": COMPLETO exige `completedCategories ===
+   * totalCategories` (ya lo calcula el backend, el front no lo reinventa).
+   */
+  completedCategories?: number | null
+  totalCategories?: number | null
+}
+
+/**
+ * Anexo dentro de un PEI o PEC (V512): las 5 categorías fijas que exige el
+ * negocio, cada una con su propio archivo vigente — mismo modelo de
+ * "versión vigente + historial" que antes tenía el documento entero.
+ *
+ * Catálogo cerrado en código (no en un catálogo de BD): pedido explícito,
+ * "fijo son esas 5". Si el día de mañana se agrega una, se agrega acá y en
+ * el `CHECK` del backend (`fn_documento_guardar`/`fn_documento_eliminar`).
+ */
+export const DOCUMENT_CATEGORIES = [
+  "PLAN_ESTUDIOS",
+  "SIEE",
+  "MANUAL_CONVIVENCIA",
+  "PROYECTOS_TRANSVERSALES",
+  "PLAN_GESTION_RIESGO",
+] as const
+export type DocumentCategoryCode = (typeof DOCUMENT_CATEGORIES)[number]
+
+export function documentCategoryDisplayName(categoria: DocumentCategoryCode): string {
+  switch (categoria) {
+    case "PLAN_ESTUDIOS":
+      return "Plan de estudios"
+    case "SIEE":
+      return "Sistema Institucional de Evaluación (SIEE)"
+    case "MANUAL_CONVIVENCIA":
+      return "Manual de convivencia"
+    case "PROYECTOS_TRANSVERSALES":
+      return "Proyectos pedagógicos transversales"
+    case "PLAN_GESTION_RIESGO":
+      return "Plan escolar de gestión del riesgo"
+  }
+}
+
+/**
+ * Fila de la tabla de anexos de un PEI/PEC puntual
+ * (`fn_documento_categorias_listar`, `GET /documentos/:TIPO/categorias`).
+ * Mismo campo `type` (PEI o PEC, el padre) + `typeName`, más `categoria`/
+ * `categoriaName` — el resto (status/fileName/uploadedAt/sizeBytes/
+ * archivoId/downloadUrl) es exactamente lo que ya tenía `Document` para un
+ * documento de un solo archivo.
+ */
+export interface DocumentCategory {
+  /** Mismo valor que `categoria`: discriminador de fila. */
+  id: DocumentCategoryCode
+  type: DocumentType
+  typeName: string
+  categoria: DocumentCategoryCode
+  categoriaName: string
+  status: DocumentStatus
+  fileName: string | null
+  uploadedAt: string | null
+  sizeBytes: number | null
+  archivoId: number | null
+  downloadUrl: string | null
+}
+
+/** Forma común de respuesta para las mutaciones de un anexo (upload/delete). */
+export interface DocumentCategoryMutationResult {
+  status: "ok" | "error"
+  message: string
+  document: DocumentCategory
 }
 
 /** Forma común de respuesta para las mutaciones (upload/delete). */
