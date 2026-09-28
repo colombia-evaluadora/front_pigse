@@ -92,6 +92,16 @@ export const paths = {
       getHref: () => "/app/gestion-documental",
     },
     /**
+     * Anexos de un PEI o PEC puntual (V512): PEI/PEC dejaron de ser un solo
+     * archivo, así que "entrar" a cualquiera de los dos muestra sus 5
+     * categorías fijas. PMI no navega acá — sigue siendo un solo archivo,
+     * se sube/elimina directo desde `gestionDocumental`.
+     */
+    gestionDocumentalDetalle: {
+      path: "gestion-documental/$tipo",
+      getHref: (tipo: string) => `/app/gestion-documental/${tipo}`,
+    },
+    /**
      * Monitoreo y cumplimiento: tablero del usuario monitor con las métricas
      * globales de entrega documental (PEI / PEC / PMI) y el detalle por EE.
      * Comparte el grupo "Monitoreo" del menú con `gestionDocumental` (la

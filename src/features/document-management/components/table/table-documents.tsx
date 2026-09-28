@@ -18,7 +18,7 @@ import { canWriteDocuments } from "@/lib/auth-routes"
 import { hasAnyRole, PIGSE_ROLES } from "@/lib/auth-mapper"
 
 import { useDocumentsQuery, useAllDocumentsQuery } from "@/features/document-management/api/query/use-documents"
-import { columns as ownColumns, allInstitutionsColumns } from "@/features/document-management/components/table/columns-documents"
+import { buildOwnColumns, allInstitutionsColumns } from "@/features/document-management/components/table/columns-documents"
 import {
   SearchDocuments,
   type DocumentsFilters,
@@ -55,10 +55,7 @@ function OwnEstablishmentDocumentsTable() {
   const userQuery = useUser()
 
   const isReadOnly = !canWriteDocuments(userQuery.data)
-  const columns = useMemo(
-    () => (isReadOnly ? ownColumns.filter((column) => column.id !== "singleAction") : ownColumns),
-    [isReadOnly],
-  )
+  const columns = useMemo(() => buildOwnColumns(isReadOnly), [isReadOnly])
 
   const { table } = useDataTable({
     columns,
