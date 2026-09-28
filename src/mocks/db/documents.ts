@@ -1,4 +1,10 @@
-import type { Document, DocumentType } from "@/features/document-management/api/types/document"
+import type {
+  Document,
+  DocumentCategory,
+  DocumentCategoryCode,
+  DocumentType,
+} from "@/features/document-management/api/types/document"
+import { DOCUMENT_CATEGORIES, documentCategoryDisplayName } from "@/features/document-management/api/types/document"
 
 /**
  * Catálogo cerrado de los tipos de documento institucional que el
@@ -44,29 +50,28 @@ export const DOCUMENT_TYPES: DocumentTypeDefinition[] = [
 const ESTABLISHMENT_SLUG = "Denzil_Escolar"
 
 /**
- * Estado inicial del mock: PEI ya tiene una versión cargada (estado
- * COMPLETO), PEC y PMI todavía no (estado PENDIENTE). El nombre del
- * archivo semilla sigue el patrón `<slug>_<tipo>_<año>.pdf` para que
- * luzca realista y matchee el ejemplo del Figma.
+ * Estado inicial del mock (V512): "IE Denzil Educativa" es un establecimiento
+ * regular (`etnias = 'N'`), así que entrega PEI y su PEC NO_APLICA — misma
+ * regla excluyente de siempre. PEI y PMI ya NO cuelgan de un archivo propio
+ * en la fila principal: PEI reporta su avance de anexos (`completedCategories`/
+ * `totalCategories`, ver `documentCategoriesDb` más abajo); PMI sigue siendo
+ * un solo archivo, sin cambios.
  */
 const initialDocuments: Document[] = [
   {
     id: "PEI",
     type: "PEI",
     typeName: "Proyecto Educativo Institucional (PEI)",
-    status: "COMPLETO",
-    fileName: `${ESTABLISHMENT_SLUG}_PEI_2026.pdf`,
-    uploadedAt: "2026-02-14T10:30:00.000Z",
-    sizeBytes: 1_842_336,
-    archivoId: 490033,
-    downloadUrl: "/api/files/download/490033",
+    status: "PENDIENTE",
+    fileName: null,
+    uploadedAt: null,
+    sizeBytes: null,
+    archivoId: null,
+    downloadUrl: null,
+    completedCategories: 0,
+    totalCategories: DOCUMENT_CATEGORIES.length,
   },
   {
-    // "IE Denzil Educativa" es un establecimiento regular (`etnias = 'N'` en
-    // TESTABLECIMIENTO), así que entrega PEI y su PEC NO APLICA. Es la regla
-    // que aplica `fn_pigse_documentos_listar` en el backend, y el caso está
-    // sembrado a propósito para poder ver el estado gris sin acción en dev:
-    // PEI y PEC son excluyentes por modalidad, nunca están los dos pendientes.
     id: "PEC",
     type: "PEC",
     typeName: "Proyecto Educativo Comunitario (PEC)",
@@ -76,6 +81,8 @@ const initialDocuments: Document[] = [
     sizeBytes: null,
     archivoId: null,
     downloadUrl: null,
+    completedCategories: null,
+    totalCategories: null,
   },
   {
     id: "PMI",
@@ -94,21 +101,52 @@ const initialDocuments: Document[] = [
 export const documentsDb: Document[] = [...initialDocuments]
 
 /**
- * Devuelve el documento ACTUAL (la versión vigente) por tipo. Nunca devuelve
- * `undefined` mientras los ids del catálogo estén cerrados — los tres tipos
- * nacen sembrados — pero se deja tipado como opcional para no romper la
- * verificación de nulidad del caller.
+ * Anexos de PEI/PEC (V512): una fila por (tipo, categoría) — solo PEI y PEC
+ * tienen filas acá, PMI nunca. Sembrado con "Plan de estudios" ya cargado
+ * para que el estado "3/5" (o el que sea) se vea desde el arranque sin
+ * tener que subir nada primero.
  */
+export const documentCategoriesDb: DocumentCategory[] = DOCUMENT_CATEGORIES.map((categoria) => ({
+  id: categoria,
+  type: "PEI",
+  typeName: "Proyecto Educativo Institucional (PEI)",
+  categoria,
+  categoriaName: documentCategoryDisplayName(categoria),
+  status: categoria === "PLAN_ESTUDIOS" ? "COMPLETO" : "PENDIENTE",
+  fileName: categoria === "PLAN_ESTUDIOS" ? `${ESTABLISHMENT_SLUG}_PEI_PLAN_ESTUDIOS_2026.pdf` : null,
+  uploadedAt: categoria === "PLAN_ESTUDIOS" ? "2026-02-14T10:30:00.000Z" : null,
+  sizeBytes: categoria === "PLAN_ESTUDIOS" ? 1_842_336 : null,
+  archivoId: categoria === "PLAN_ESTUDIOS" ? 490_033 : null,
+  downloadUrl: categoria === "PLAN_ESTUDIOS" ? "/api/files/download/490033" : null,
+}))
+
+function recalcDocumentProgress(type: DocumentType): void {
+  if (type === "PMI") return
+  const rows = documentCategoriesDb.filter((c) => c.type === type)
+  const completed = rows.filter((c) => c.fileName !== null).length
+  const document = documentsDb.find((d) => d.type === type)
+  if (!document || document.status === "NO_APLICA") return
+  document.completedCategories = completed
+  document.totalCategories = rows.length
+  document.status = completed === rows.length ? "COMPLETO" : "PENDIENTE"
+}
+recalcDocumentProgress("PEI")
+
 export function findDocumentByType(type: DocumentType): Document | undefined {
   return documentsDb.find((document) => document.type === type)
 }
 
-/**
- * Carga una nueva versión del documento: reemplaza la vigente en la fila
- * principal. No se valida tipo mime ni tamaño — eso lo hace
- * `DialogUploadDocument` en el cliente antes de mandar la petición. El
- * backend real lo haría en `file-service`, no en el query-service.
- */
+export function findDocumentCategory(
+  type: DocumentType,
+  categoria: DocumentCategoryCode,
+): DocumentCategory | undefined {
+  return documentCategoriesDb.find((c) => c.type === type && c.categoria === categoria)
+}
+
+export function listDocumentCategories(type: DocumentType): DocumentCategory[] {
+  return documentCategoriesDb.filter((c) => c.type === type)
+}
+
 /** Ids sintéticos para los archivos que se suben en modo mock. */
 let archivoIdSeq = 490_100
 function nextArchivoId(): number {
@@ -116,16 +154,18 @@ function nextArchivoId(): number {
   return archivoIdSeq
 }
 
+/**
+ * Carga (o reemplaza) la versión vigente de PMI — el único tipo que sigue
+ * siendo un solo archivo. No se valida tipo mime ni tamaño — eso lo hace
+ * `DialogUploadDocument` en el cliente antes de mandar la petición.
+ */
 export function uploadDocumentVersion(params: {
-  type: DocumentType
+  type: "PMI"
   fileName: string
   sizeBytes: number
 }): Document {
   const existing = findDocumentByType(params.type)
   const uploadedAt = new Date().toISOString()
-  // El backend real devuelve el `pk_tarchivo` que acaba de crear el
-  // file-service. Acá se sintetiza uno para que la fila recién subida tenga
-  // una descarga funcional, igual que las sembradas.
   const archivoId = nextArchivoId()
 
   const next: Document = {
@@ -151,12 +191,7 @@ export function uploadDocumentVersion(params: {
   return next
 }
 
-/**
- * Elimina la versión vigente de un documento: el estado vuelve a
- * `PENDIENTE` y el archivo desaparece (no se mantiene historial de
- * versiones anteriores en este módulo).
- */
-export function deleteCurrentDocumentVersion(type: DocumentType): Document | undefined {
+export function deleteCurrentDocumentVersion(type: "PMI"): Document | undefined {
   const existing = findDocumentByType(type)
   if (!existing) return undefined
 
@@ -173,5 +208,69 @@ export function deleteCurrentDocumentVersion(type: DocumentType): Document | und
     documentsDb[index] = cleared
   }
 
+  return cleared
+}
+
+/** Carga (o reemplaza) el archivo vigente de UN anexo de PEI/PEC. */
+export function uploadDocumentCategoryVersion(params: {
+  type: DocumentType
+  categoria: DocumentCategoryCode
+  fileName: string
+  sizeBytes: number
+}): DocumentCategory {
+  const existing = findDocumentCategory(params.type, params.categoria)
+  const uploadedAt = new Date().toISOString()
+  const archivoId = nextArchivoId()
+
+  const next: DocumentCategory = {
+    id: params.categoria,
+    type: params.type,
+    typeName: existing?.typeName ?? DOCUMENT_TYPES.find((t) => t.id === params.type)?.name ?? params.type,
+    categoria: params.categoria,
+    categoriaName: documentCategoryDisplayName(params.categoria),
+    status: "COMPLETO",
+    fileName: params.fileName,
+    uploadedAt,
+    sizeBytes: params.sizeBytes,
+    archivoId,
+    downloadUrl: `/api/files/download/${archivoId}`,
+  }
+
+  const index = documentCategoriesDb.findIndex(
+    (c) => c.type === params.type && c.categoria === params.categoria,
+  )
+  if (index >= 0) {
+    documentCategoriesDb[index] = next
+  } else {
+    documentCategoriesDb.push(next)
+  }
+
+  recalcDocumentProgress(params.type)
+  return next
+}
+
+export function deleteDocumentCategoryVersion(
+  type: DocumentType,
+  categoria: DocumentCategoryCode,
+): DocumentCategory | undefined {
+  const existing = findDocumentCategory(type, categoria)
+  if (!existing) return undefined
+
+  const cleared: DocumentCategory = {
+    ...existing,
+    status: "PENDIENTE",
+    fileName: null,
+    uploadedAt: null,
+    sizeBytes: null,
+    archivoId: null,
+    downloadUrl: null,
+  }
+
+  const index = documentCategoriesDb.findIndex((c) => c.type === type && c.categoria === categoria)
+  if (index >= 0) {
+    documentCategoriesDb[index] = cleared
+  }
+
+  recalcDocumentProgress(type)
   return cleared
 }
