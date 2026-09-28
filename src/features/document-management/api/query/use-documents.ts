@@ -61,6 +61,9 @@ interface RealAllDocumentRow {
   downloadUrl: string | null
   establecimientoId: number
   establecimientoNombre: string
+  /** V512: solo PEI/PEC — ver `Document.completedCategories`. */
+  completedCategories: number | null
+  totalCategories: number | null
 }
 
 function toDocument(row: RealAllDocumentRow): Document {

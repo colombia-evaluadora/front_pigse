@@ -36,6 +36,7 @@ import {
   tableOperationsSearchSchema,
 } from "@/features/administration/audits/api/schema"
 import { userActivitySearchSchema } from "@/features/administration/user-activity/api/schema"
+import { documentTypeDisplayName } from "@/features/document-management/api/types/document"
 import {
   getFirstNavUrl,
   navItemsQueryOptions,
@@ -120,6 +121,10 @@ const AddEstablishmentPage = lazyRouteComponent(
 const DocumentManagementPage = lazyRouteComponent(
   () => import("@/features/document-management/pages/document-management-page"),
   "DocumentManagementPage",
+)
+const DocumentCategoryDetailPage = lazyRouteComponent(
+  () => import("@/features/document-management/pages/document-category-detail-page"),
+  "DocumentCategoryDetailPage",
 )
 
 const MonitoringCompliancePage = lazyRouteComponent(
@@ -505,6 +510,27 @@ export const gestionDocumentalRoute = createRoute({
   component: DocumentManagementPage,
 })
 
+// Anexos de un PEI o PEC puntual (V512). PMI no tiene categorías: si alguien
+// entra con esa URL a mano, lo mandamos de vuelta al listado en vez de
+// mostrar una pantalla que no resuelve nada.
+export const gestionDocumentalDetalleRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: paths.app.gestionDocumentalDetalle.path,
+  beforeLoad: ({ params }) => {
+    if (params.tipo !== "PEI" && params.tipo !== "PEC") {
+      throw redirect({ to: paths.app.gestionDocumental.getHref() })
+    }
+  },
+  staticData: {
+    breadcrumb: (params: Record<string, string>) => [
+      MONITOREO_CRUMB,
+      { label: "Gestión documental", to: paths.app.gestionDocumental.getHref() },
+      { label: documentTypeDisplayName(params.tipo as "PEI" | "PEC") },
+    ],
+  },
+  component: DocumentCategoryDetailPage,
+})
+
 export const monitoreoCumplimientoRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: paths.app.monitoreoCumplimiento.path,
@@ -564,6 +590,7 @@ const routeTree = rootRoute.addChildren([
       editEstablishmentRoute,
     ]),
     gestionDocumentalRoute,
+    gestionDocumentalDetalleRoute,
     monitoreoCumplimientoRoute,
     visorRoute,
     unauthorizedRoute,
