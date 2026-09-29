@@ -136,10 +136,15 @@ export function documentCategoryDisplayName(categoria: DocumentCategoryCode): st
  * `categoriaName` — el resto (status/fileName/uploadedAt/sizeBytes/
  * archivoId/downloadUrl) es exactamente lo que ya tenía `Document` para un
  * documento de un solo archivo.
+ *
+ * `id` NO es siempre `categoria` (V515): "Plan de estudios" admite varios
+ * archivos a la vez, así que ahí `id` es el `archivoId` de esa fila puntual
+ * (como texto) — sigue siendo `categoria` para las otras 4 categorías (un
+ * solo archivo cada una, igual que en V512) y para la fila PENDIENTE
+ * placeholder de "Plan de estudios" cuando todavía no tiene ningún archivo.
  */
 export interface DocumentCategory {
-  /** Mismo valor que `categoria`: discriminador de fila. */
-  id: DocumentCategoryCode
+  id: string
   type: DocumentType
   typeName: string
   categoria: DocumentCategoryCode

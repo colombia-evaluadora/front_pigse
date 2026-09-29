@@ -84,6 +84,14 @@ interface UploadDocumentCategoryDialogProps {
   category: DocumentCategory
   triggerVariant?: "button" | "icon"
   triggerLabel?: React.ReactNode
+  /**
+   * "Plan de estudios" (V515) admite varios archivos a la vez: cada carga
+   * SUMA un archivo, nunca reemplaza uno existente. El resto de las
+   * categorías siguen siendo "reemplazar la versión vigente" (igual que
+   * PMI). Cambia el copy del diálogo y esconde el bloque "Versión vigente
+   * actual" (no aplica cuando no se está reemplazando nada).
+   */
+  alwaysAdds?: boolean
 }
 
 /**
@@ -96,6 +104,7 @@ export function UploadDocumentCategoryDialog({
   category,
   triggerVariant = "button",
   triggerLabel,
+  alwaysAdds = false,
 }: UploadDocumentCategoryDialogProps) {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -156,10 +165,16 @@ export function UploadDocumentCategoryDialog({
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Cargar anexo</DialogTitle>
+          <DialogTitle>{alwaysAdds ? "Agregar archivo" : "Cargar anexo"}</DialogTitle>
           <DialogDescription>
-            Adjunte la versión vigente de {category.categoriaName.toLowerCase()}. El archivo
-            anterior, si lo hay, pasará al historial de versiones anteriores.
+            {alwaysAdds ? (
+              <>Adjunte un archivo más de {category.categoriaName.toLowerCase()}.</>
+            ) : (
+              <>
+                Adjunte la versión vigente de {category.categoriaName.toLowerCase()}. El archivo
+                anterior, si lo hay, pasará al historial de versiones anteriores.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -212,7 +227,7 @@ export function UploadDocumentCategoryDialog({
             ) : null}
           </div>
 
-          {category.fileName ? (
+          {!alwaysAdds && category.fileName ? (
             <div className="flex items-start gap-3 rounded-md border border-border bg-muted/20 p-3 text-sm">
               <FilePdfIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
@@ -243,7 +258,7 @@ export function UploadDocumentCategoryDialog({
               ) : (
                 <PaperclipIcon data-icon="inline-start" />
               )}
-              Cargar anexo
+              {alwaysAdds ? "Agregar archivo" : "Cargar anexo"}
             </Button>
           </DialogFooter>
         </form>
