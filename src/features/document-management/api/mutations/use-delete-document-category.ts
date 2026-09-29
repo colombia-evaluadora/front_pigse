@@ -14,14 +14,21 @@ import type {
 } from "@/features/document-management/api/types/document"
 
 /**
- * `PATCH /pigse/documentos/:TIPO/categorias/:CATEGORIA` (V512) — baja
+ * `PATCH /pigse/documentos/:TIPO/categorias/:CATEGORIA` (V512/V515) — baja
  * lógica de UN anexo puntual de PEI/PEC. Mismo criterio que
- * `use-delete-document.ts`: el archivo pasa al historial, el anexo vuelve
- * a PENDIENTE, nunca se borra.
+ * `use-delete-document.ts`: el archivo pasa al historial, nunca se borra.
+ *
+ * `archivoId` (V515): obligatorio para "Plan de estudios" — esa categoría
+ * admite varios archivos a la vez, así que hay que decirle al backend CUÁL
+ * de todos se da de baja (`fn_documento_eliminar` lo exige, rechaza con
+ * 400/22023 si falta). Para las otras 4 categorías (un solo archivo cada
+ * una) va `null` — el backend rechaza si viene un id ahí, porque no
+ * corresponde.
  */
 async function deleteDocumentCategory(params: {
   type: DocumentType
   categoria: DocumentCategoryCode
+  archivoId?: number | null
 }): Promise<DocumentCategoryMutationResult> {
   const url = apiPath(
     `/documents/${params.type}/categories/${params.categoria}`,
@@ -29,7 +36,7 @@ async function deleteDocumentCategory(params: {
   )
   const response = await api.patch<
     DocumentCategoryMutationResult | RowsEnvelope<DocumentCategoryMutationResult>
-  >(url)
+  >(url, { ARCHIVOID: params.archivoId ?? null })
   return unwrapRow(response)
 }
 
