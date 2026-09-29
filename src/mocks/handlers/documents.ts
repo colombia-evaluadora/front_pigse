@@ -5,6 +5,7 @@ import {
   documentCategoriesDb,
   findDocumentByType,
   findDocumentCategory,
+  findDocumentCategoryByArchivo,
   listDocumentCategories,
   uploadDocumentVersion,
   deleteCurrentDocumentVersion,
@@ -342,10 +343,11 @@ export const documentHandlers = [
   }),
 
   /**
-   * Elimina la versión vigente de UN anexo de PEI/PEC. Mismo criterio que
-   * el PATCH de arriba: baja lógica, el archivo pasa al historial.
+   * Elimina UN anexo de PEI/PEC. Mismo criterio que el PATCH de arriba: baja
+   * lógica, el archivo pasa al historial. "Plan de estudios" (V515) exige
+   * `ARCHIVOID` en el body -- admite varios archivos, hay que decir cuál.
    */
-  http.patch("*/api/documents/:type/categories/:categoria", async ({ params }) => {
+  http.patch("*/api/documents/:type/categories/:categoria", async ({ params, request }) => {
     await delay(250)
 
     const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
@@ -362,6 +364,31 @@ export const documentHandlers = [
         { status: "error", message: "Categoría inválida." },
         { status: 400 },
       )
+    }
+
+    const body = (await request.json().catch(() => null)) as { ARCHIVOID?: number | null } | null
+    const archivoId = body?.ARCHIVOID ?? null
+
+    if (categoriaParam === "PLAN_ESTUDIOS") {
+      if (archivoId == null) {
+        return HttpResponse.json(
+          { status: "error", message: "Plan de estudios admite varios archivos -- indique cuál." },
+          { status: 400 },
+        )
+      }
+      const existing = findDocumentCategoryByArchivo(typeParam, categoriaParam, archivoId)
+      if (!existing) {
+        return HttpResponse.json(
+          { status: "error", message: "Archivo no encontrado en Plan de estudios." },
+          { status: 404 },
+        )
+      }
+      const document = deleteDocumentCategoryVersion(typeParam, categoriaParam, archivoId)
+      return HttpResponse.json<DocumentCategoryMutationResult>({
+        status: "ok",
+        message: "Anexo eliminado.",
+        document: document!,
+      })
     }
 
     const existing = findDocumentCategory(typeParam, categoriaParam)

@@ -45,7 +45,13 @@ export function DeleteDocumentCategoryDialog({ category }: DeleteDocumentCategor
       confirmLabel="Sí, eliminar"
       hidden={!category.fileName}
       onConfirm={() =>
-        deleteMutation.mutateAsync({ type: category.type, categoria: category.categoria })
+        deleteMutation.mutateAsync({
+          type: category.type,
+          categoria: category.categoria,
+          // "Plan de estudios" admite varios archivos (V515): hay que decir
+          // cuál de todos se elimina. Las demás categorías van sin esto.
+          archivoId: category.categoria === "PLAN_ESTUDIOS" ? category.archivoId : null,
+        })
       }
       trigger={
         <Button
