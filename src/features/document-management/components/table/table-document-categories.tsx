@@ -4,9 +4,11 @@ import { Link } from "@tanstack/react-router"
 
 import {
   TableScreen,
+  TableScreenActions,
   TableScreenBody,
   TableScreenHeader,
   TableScreenTitle,
+  TableScreenToolbar,
 } from "@/components/layout/table-screen"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
@@ -21,8 +23,12 @@ import {
   documentCategoryColumns,
   documentCategoryReadOnlyColumns,
 } from "@/features/document-management/components/table/columns-document-categories"
-import { documentTypeDisplayName } from "@/features/document-management/api/types/document"
-import type { DocumentType } from "@/features/document-management/api/types/document"
+import { UploadDocumentCategoryDialog } from "@/features/document-management/components/dialogs/dialog-upload-document-category"
+import {
+  documentTypeDisplayName,
+  documentCategoryDisplayName,
+} from "@/features/document-management/api/types/document"
+import type { DocumentCategory, DocumentType } from "@/features/document-management/api/types/document"
 
 interface DocumentCategoriesTableProps {
   type: DocumentType
@@ -38,6 +44,30 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
   const { data: categories = [], isPending, isError, refetch } = useDocumentCategoriesQuery(type)
   const userQuery = useUser()
   const isReadOnly = !canWriteDocuments(userQuery.data)
+
+  // "Plan de estudios" (V515) admite varios archivos a la vez: a diferencia
+  // de las otras 4 categorías, nunca deja de ofrecer "Agregar" solo porque
+  // ya tenga uno cargado — por eso este botón vive afuera de la tabla
+  // (la fila de acción de cada categoría de un solo archivo sigue
+  // resolviendo Subir/Eliminar como siempre, ver `columns-document-categories.tsx`).
+  // Si el tipo no aplica para este EE (NO_APLICA), ninguna fila ofrece
+  // acción — ni esta.
+  const planEstudiosNoAplica = categories.some(
+    (c) => c.categoria === "PLAN_ESTUDIOS" && c.status === "NO_APLICA",
+  )
+  const planEstudiosAddTarget: DocumentCategory = {
+    id: "plan-estudios-agregar",
+    type,
+    typeName: documentTypeDisplayName(type),
+    categoria: "PLAN_ESTUDIOS",
+    categoriaName: documentCategoryDisplayName("PLAN_ESTUDIOS"),
+    status: "PENDIENTE",
+    fileName: null,
+    uploadedAt: null,
+    sizeBytes: null,
+    archivoId: null,
+    downloadUrl: null,
+  }
 
   const { table } = useDataTable({
     columns: isReadOnly ? documentCategoryReadOnlyColumns : documentCategoryColumns,
@@ -72,6 +102,18 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
         >
           {documentTypeDisplayName(type)}
         </TableScreenTitle>
+        {!isReadOnly && !planEstudiosNoAplica && (
+          <TableScreenToolbar>
+            <span />
+            <TableScreenActions>
+              <UploadDocumentCategoryDialog
+                category={planEstudiosAddTarget}
+                triggerLabel="Agregar a Plan de estudios"
+                alwaysAdds
+              />
+            </TableScreenActions>
+          </TableScreenToolbar>
+        )}
       </TableScreenHeader>
 
       <TableScreenBody>
