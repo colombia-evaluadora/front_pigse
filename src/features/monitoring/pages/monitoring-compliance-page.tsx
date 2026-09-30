@@ -3,7 +3,8 @@ import { MonitoringComplianceTable } from "@/features/monitoring/components/tabl
 /**
  * Pantalla "Monitoreo y Consulta de Cumplimiento Institucional":
  * tablero del usuario monitor con las métricas globales de cumplimiento
- * documental (PEI / PEC / PMI) y el detalle por establecimiento educativo.
+ * documental (PEI / PEC / PMI / PFI) y el detalle por establecimiento
+ * educativo.
  *
  * Sigue el patrón canónico de las páginas de listado del aplicativo: la
  * página es una pieza mínima que delega toda la estructura (encabezado,

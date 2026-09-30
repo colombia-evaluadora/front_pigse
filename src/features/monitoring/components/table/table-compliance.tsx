@@ -26,7 +26,7 @@ import {
 
 /**
  * Tablero "Monitoreo y cumplimiento institucional": KPIs globales de
- * entrega documental (PEI / PEC / PMI) arriba y detalle por EE abajo.
+ * entrega documental (PEI / PEC / PMI / PFI) arriba y detalle por EE abajo.
  *
  * El bloque de métricas NO es sticky a propósito: cuando el usuario scrollea
  * el listado, las tarjetas se van con el contenido en lugar de quedar pegadas
@@ -55,7 +55,8 @@ function MonitoringComplianceTableContent() {
     (filters.search ? 1 : 0) +
     (filters.pei.length ? 1 : 0) +
     (filters.pec.length ? 1 : 0) +
-    (filters.pmi.length ? 1 : 0)
+    (filters.pmi.length ? 1 : 0) +
+    (filters.pfi.length ? 1 : 0)
 
   const { data, isPending, isError, refetch } = useComplianceRowsQuery({
     filters,

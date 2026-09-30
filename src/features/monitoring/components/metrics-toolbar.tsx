@@ -6,17 +6,17 @@ import { KpiDonutCard } from "@/features/monitoring/components/kpi-donut-card"
 
 /**
  * Bloque de KPIs del tablero "Monitoreo y cumplimiento institucional":
- * una tarjeta grande con el total de EE y tres tarjetas con el avance
- * por documento (PEI / PEC / PMI) renderizadas con donut.
+ * una tarjeta grande con el total de EE y cuatro tarjetas con el avance
+ * por documento (PEI / PEC / PMI / PFI) renderizadas con donut.
  *
  * Replica la fila del Figma y el patrón de `AuditSessionStatsCards`:
- * cuatro `Card` de `size="sm"` en una grilla responsive, todas sobre el
+ * cinco `Card` de `size="sm"` en una grilla responsive, todas sobre el
  * mismo fondo de la `TableScreenBody` que las contiene. La variante de
  * color del donut sale del porcentaje: verde si está al día, ámbar si
  * va regular, rojo si está en alerta (≤ 30%).
  *
  * Mientras la consulta está en vuelo se pinta un esqueleto del mismo
- * layout —cuatro tarjetas placeholder— para que la página no salte de
+ * layout —cinco tarjetas placeholder— para que la página no salte de
  * tamaño al llegar los datos.
  */
 export function ComplianceMetricsCards() {
@@ -24,8 +24,8 @@ export function ComplianceMetricsCards() {
 
   if (isPending || !metrics) {
     return (
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
           <Card key={index} size="sm">
             <CardContent className="h-24 animate-pulse rounded-md bg-muted/40" />
           </Card>
@@ -35,7 +35,7 @@ export function ComplianceMetricsCards() {
   }
 
   return (
-    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <TotalEstablishmentsCard value={metrics.totalEstablishments} />
       <KpiDonutCard
         label="Avance PEI"
@@ -57,6 +57,13 @@ export function ComplianceMetricsCards() {
         completed={metrics.pmi.completed}
         total={metrics.pmi.total}
         variant={variantFor(metrics.pmi.percent)}
+      />
+      <KpiDonutCard
+        label="Avance PFI"
+        percent={metrics.pfi.percent}
+        completed={metrics.pfi.completed}
+        total={metrics.pfi.total}
+        variant={variantFor(metrics.pfi.percent)}
       />
     </div>
   )
