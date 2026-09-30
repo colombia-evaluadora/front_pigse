@@ -6,9 +6,13 @@ import { unauthorizedSearchSchema } from "@/components/layout/unauthorized-searc
 import { unauthorizedRoute } from "@/router"
 
 /**
- * Pantalla que se muestra cuando el usuario autenticado intenta entrar a
- * una ruta que no está en su menú. La dispara `appLayoutRoute.beforeLoad`
- * en `router.tsx` cuando `canAccessPath` rechaza la URL.
+ * Pantalla de "No autorizado". Ya no la dispara ningún gate de rutas del
+ * router (ver el comentario de `appLayoutRoute.beforeLoad` en
+ * `router.tsx`: se sacó `canAccessPath`, mismo criterio que
+ * `front_colombia_evaluadora` — el front confía en lo que el backend ya
+ * filtró para el menú, no revalida). Sigue viva porque la usa
+ * `findFirstAllowedPath` como último recurso cuando un usuario autenticado
+ * no tiene ningún rol de PIGSE.
  *
  * Los query params llegan desde el redirect (`from` = URL original,
  * `home` = primera ruta permitida). El botón "Ir a mi inicio" usa el

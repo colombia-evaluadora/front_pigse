@@ -37,11 +37,40 @@ export const DOCUMENT_READERS = [
 /**
  * Roles que pueden ESCRIBIR (subir / dar de baja) documentos.
  *
- * El Rector queda afuera a propósito: en la BD, `POST /documentos/upload` y
- * `PATCH /documentos/:TIPO` sólo aceptan ADMINISTRADOR y SECRETARIO. El
- * Rector entra al módulo en modo lectura.
+ * V521: el Rector gana los mismos permisos de escritura que el Secretario
+ * (`POST /documentos/upload`, `PATCH /documentos/:TIPO/categorias/:CATEGORIA`
+ * ya aceptan PIGSE-RECTOR en la BD) — pedido explícito, antes entraba al
+ * módulo en modo lectura.
  */
-export const DOCUMENT_WRITERS = [PIGSE_ROLES.Administrador, PIGSE_ROLES.Secretario] as const
+export const DOCUMENT_WRITERS = [
+  PIGSE_ROLES.Administrador,
+  PIGSE_ROLES.Secretario,
+  PIGSE_ROLES.Rector,
+] as const
+
+/**
+ * Roles que pueden VER la fecha límite global de Gestión documental y sus
+ * excepciones por establecimiento (V522, `GET /documentos/fecha-limite`).
+ * Los mismos que ya ven el módulo, más Secretaria Territorial (que no
+ * tiene por qué ver los documentos en sí, pero sí administra el plazo).
+ */
+export const DOCUMENT_DEADLINE_READERS = [
+  PIGSE_ROLES.Administrador,
+  PIGSE_ROLES.Rector,
+  PIGSE_ROLES.Secretario,
+  PIGSE_ROLES.SecretariaTerritorial,
+] as const
+
+/**
+ * Roles que pueden FIJAR la fecha límite global y gestionar excepciones
+ * por establecimiento (V522). Distinto de `DOCUMENT_WRITERS`: acá NO
+ * entran Rector/Secretario (ellos suben documentos, no deciden el plazo),
+ * pero sí Secretaria Territorial.
+ */
+export const DOCUMENT_DEADLINE_WRITERS = [
+  PIGSE_ROLES.Administrador,
+  PIGSE_ROLES.SecretariaTerritorial,
+] as const
 
 /** Roles que pueden ver el tablero de monitoreo (`GET /cumplimiento/*`). */
 export const COMPLIANCE_VIEWERS = [
@@ -96,6 +125,11 @@ export function canWriteDocuments(user: MaybeUser): boolean {
   return hasAnyRole(user, DOCUMENT_WRITERS)
 }
 
+/** ¿El usuario puede fijar la fecha límite global o gestionar excepciones? */
+export function canWriteDocumentDeadline(user: MaybeUser): boolean {
+  return hasAnyRole(user, DOCUMENT_DEADLINE_WRITERS)
+}
+
 /**
  * Primera ruta absoluta (con `/app`) que el usuario puede ver. Alimenta el
  * redirect de `/app` y el botón "Ir a mi inicio" de la pantalla 403.
@@ -110,22 +144,4 @@ export function findFirstAllowedPath(user: MaybeUser): string {
     if (hasAnyRole(user, rule.allowedRoles)) return `/app${rule.prefix}`
   }
   return "/app/no-autorizado"
-}
-
-/**
- * ¿El usuario puede visitar `pathname`?
- *
- * Las rutas no listadas se permiten (`/app/no-autorizado` misma, por
- * ejemplo). Las listadas exigen intersección con `allowedRoles`.
- */
-export function canAccessPath(pathname: string, user: MaybeUser): boolean {
-  const relative = pathname.replace(/^\/app/, "")
-  if (relative === "" || relative === "/") return true
-
-  for (const rule of ROUTE_ACCESS) {
-    if (relative === rule.prefix || relative.startsWith(`${rule.prefix}/`)) {
-      return hasAnyRole(user, rule.allowedRoles)
-    }
-  }
-  return true
 }
