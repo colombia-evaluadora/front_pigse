@@ -26,8 +26,8 @@ interface ComplianceStatusCellProps {
 /**
  * Celda de estado documental de un EE: replica la celda del Figma.
  *
- * - `NO_APLICA` → texto "N/A" sin dot. Es el caso de PEI/PEC en un EE cuya
- *   modalidad no lo requiere (PEI en etnoeducativos, PEC en IE).
+ * - `NO_APLICA` → texto "N/A" sin dot. Es el caso del tipo que no aplica
+ *   según `ETNIAS` del EE (PEI/PMI en etnoeducativos, PEC/PFI en el resto).
  * - `PENDIENTE` → dot rojo solo, sin texto (el EE puede/debe cargarlo).
  * - `COMPLETO` → dot verde + `HoverCard` con el nombre del archivo y un
  *   botón "Consultar Documento" que navega al visor de PDF

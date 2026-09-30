@@ -63,6 +63,20 @@ export const columns: ColumnDef<ComplianceRow>[] = [
     enableSorting: false,
   },
   {
+    accessorKey: "pfi",
+    id: "pfi",
+    meta: { label: "Estado PFI" },
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Estado PFI" />,
+    cell: ({ row }) => (
+      <ComplianceStatusCell
+        type="PFI"
+        state={row.original.pfi}
+        establishmentName={row.original.establishmentName}
+      />
+    ),
+    enableSorting: false,
+  },
+  {
     accessorKey: "globalProgress",
     id: "globalProgress",
     meta: { label: "Progreso Global" },

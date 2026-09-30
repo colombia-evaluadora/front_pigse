@@ -25,7 +25,8 @@ function applyComplianceFilters(
       (!termino || normalizar(row.establishmentName).includes(termino)) &&
       coincideEstado(filters.pei, row.pei.status) &&
       coincideEstado(filters.pec, row.pec.status) &&
-      coincideEstado(filters.pmi, row.pmi.status),
+      coincideEstado(filters.pmi, row.pmi.status) &&
+      coincideEstado(filters.pfi, row.pfi.status),
   )
 }
 
