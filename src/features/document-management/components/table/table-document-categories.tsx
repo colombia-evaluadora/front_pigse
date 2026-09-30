@@ -35,15 +35,20 @@ interface DocumentCategoriesTableProps {
 }
 
 /**
- * Anexos de un PEI o PEC puntual (V512) — 5 filas fijas, misma tabla que
- * "Detalle documentos" pero acotada a este tipo. `type` viene de la URL
- * (`/gestion-documental/:tipo`, ver `paths.ts`); PMI no navega acá (sigue
- * siendo un solo archivo, ver `columns-documents.tsx`).
+ * Anexos de un tipo puntual (V521: los 4 tipos van por categorías) —
+ * misma tabla que "Detalle documentos" pero acotada a este tipo. `type`
+ * viene de la URL (`/gestion-documental/:tipo`, ver `paths.ts`).
  */
 export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) {
   const { data: categories = [], isPending, isError, refetch } = useDocumentCategoriesQuery(type)
   const userQuery = useUser()
   const isReadOnly = !canWriteDocuments(userQuery.data)
+
+  // "Plan de estudios" (V515) es EXCLUSIVA de PEI/PEC -- PMI/PFI solo
+  // tienen "Autoevaluación institucional" (V521), que sigue el patrón de
+  // un archivo por categoría (Subir/Eliminar resuelve en
+  // `columns-document-categories.tsx`, no acá).
+  const tienePlanEstudios = type === "PEI" || type === "PEC"
 
   // "Plan de estudios" (V515) admite varios archivos a la vez: a diferencia
   // de las otras 4 categorías, nunca deja de ofrecer "Agregar" solo porque
@@ -102,7 +107,7 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
         >
           {documentTypeDisplayName(type)}
         </TableScreenTitle>
-        {!isReadOnly && !planEstudiosNoAplica && (
+        {!isReadOnly && tienePlanEstudios && !planEstudiosNoAplica && (
           <TableScreenToolbar>
             <span />
             <TableScreenActions>

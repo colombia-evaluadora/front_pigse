@@ -4,18 +4,23 @@ import type {
   DocumentCategoryCode,
   DocumentType,
 } from "@/features/document-management/api/types/document"
-import { DOCUMENT_CATEGORIES, documentCategoryDisplayName } from "@/features/document-management/api/types/document"
+import {
+  documentCategoriesForType,
+  requiredDocumentCategoriesForType,
+  documentCategoryDisplayName,
+} from "@/features/document-management/api/types/document"
 
 /**
  * Catálogo cerrado de los tipos de documento institucional que el
- * establecimiento educativo puede cargar acá: PEI, PEC y PMI. El backend
- * real lo registraría como catálogo (`TLISTA_VALOR`); en el mock vive acá
- * porque la página solo expone estas filas y no se listan desde ningún
- * endpoint remoto.
+ * establecimiento educativo puede cargar acá: PEI/PEC (proyecto
+ * educativo) y PMI/PFI (plan de mejoramiento/fortalecimiento, V521) — el
+ * backend real lo registraría como catálogo (`TLISTA_VALOR`); en el mock
+ * vive acá porque la página solo expone estas filas y no se listan desde
+ * ningún endpoint remoto.
  *
  * El `id` es el discriminador: el endpoint de detalle/carga lo recibe y
  * resuelve contra estas filas —no contra un id autonumérico de base— para
- * mantener el contrato chico (tres documentos por EE).
+ * mantener el contrato chico.
  */
 interface DocumentTypeDefinition {
   id: DocumentType
@@ -39,6 +44,11 @@ export const DOCUMENT_TYPES: DocumentTypeDefinition[] = [
     name: "Plan de Mejoramiento Institucional (PMI)",
     shortName: "PMI",
   },
+  {
+    id: "PFI",
+    name: "Plan de Fortalecimiento Institucional (PFI)",
+    shortName: "PFI",
+  },
 ]
 
 /**
@@ -50,12 +60,13 @@ export const DOCUMENT_TYPES: DocumentTypeDefinition[] = [
 const ESTABLISHMENT_SLUG = "Denzil_Escolar"
 
 /**
- * Estado inicial del mock (V512): "IE Denzil Educativa" es un establecimiento
- * regular (`etnias = 'N'`), así que entrega PEI y su PEC NO_APLICA — misma
- * regla excluyente de siempre. PEI y PMI ya NO cuelgan de un archivo propio
- * en la fila principal: PEI reporta su avance de anexos (`completedCategories`/
- * `totalCategories`, ver `documentCategoriesDb` más abajo); PMI sigue siendo
- * un solo archivo, sin cambios.
+ * Estado inicial del mock: "IE Denzil Educativa" es un establecimiento
+ * regular (`etnias = 'N'`), así que entrega PEI + PMI — su PEC/PFI no
+ * aplican y, desde V521, directamente NO aparecen acá (antes se veían
+ * como fila NO_APLICA). Los 4 tipos van por categorías (V521): esta fila
+ * solo reporta el avance (`completedCategories`/`totalCategories`,
+ * ver `documentCategoriesDb` más abajo), el archivo real vive en cada
+ * anexo.
  */
 const initialDocuments: Document[] = [
   {
@@ -69,20 +80,7 @@ const initialDocuments: Document[] = [
     archivoId: null,
     downloadUrl: null,
     completedCategories: 0,
-    totalCategories: DOCUMENT_CATEGORIES.length,
-  },
-  {
-    id: "PEC",
-    type: "PEC",
-    typeName: "Proyecto Educativo Comunitario (PEC)",
-    status: "NO_APLICA",
-    fileName: null,
-    uploadedAt: null,
-    sizeBytes: null,
-    archivoId: null,
-    downloadUrl: null,
-    completedCategories: null,
-    totalCategories: null,
+    totalCategories: requiredDocumentCategoriesForType("PEI").length,
   },
   {
     id: "PMI",
@@ -94,10 +92,12 @@ const initialDocuments: Document[] = [
     sizeBytes: null,
     archivoId: null,
     downloadUrl: null,
+    completedCategories: 0,
+    totalCategories: requiredDocumentCategoriesForType("PMI").length,
   },
 ]
 
-/** Tabla en memoria: clave = id de tipo de documento (`PEI` | `PEC` | `PMI`). */
+/** Tabla en memoria: clave = id de tipo de documento (`PEI` | `PEC` | `PMI` | `PFI`). */
 export const documentsDb: Document[] = [...initialDocuments]
 
 /** Ids sintéticos para los archivos que se suben en modo mock. */
@@ -108,15 +108,15 @@ function nextArchivoId(): number {
 }
 
 /**
- * Anexos de PEI/PEC: una fila por archivo. Para las 4 categorías de un solo
- * archivo (SIEE, Manual de convivencia, Proyectos transversales, Plan de
- * gestión del riesgo) hay a lo sumo 1 fila por (tipo, categoría), `id` =
- * categoría. "Plan de estudios" (V515) admite VARIAS filas activas a la vez
- * -- ahí `id` es el `archivoId` (como texto), porque puede haber más de una.
+ * Anexos de cada tipo: una fila por archivo. Para las categorías de un
+ * solo archivo (todas menos "Plan de estudios") hay a lo sumo 1 fila por
+ * (tipo, categoría), `id` = categoría. "Plan de estudios" (V515, solo
+ * PEI/PEC) admite VARIAS filas activas a la vez -- ahí `id` es el
+ * `archivoId` (como texto), porque puede haber más de una.
  *
- * Sembrado con "Plan de estudios" ya con un archivo cargado, para ver el
- * avance parcial ("1/5" o el que sea) desde el arranque sin subir nada
- * primero.
+ * Sembrado con "Plan de estudios" (PEI) ya con un archivo cargado, para
+ * ver el avance parcial desde el arranque sin subir nada primero. PMI
+ * arranca sin nada (todas sus categorías, la única, PENDIENTE).
  */
 const seedPlanEstudiosArchivoId = nextArchivoId()
 export const documentCategoriesDb: DocumentCategory[] = [
@@ -133,11 +133,28 @@ export const documentCategoriesDb: DocumentCategory[] = [
     archivoId: seedPlanEstudiosArchivoId,
     downloadUrl: `/api/files/download/${seedPlanEstudiosArchivoId}`,
   },
-  ...DOCUMENT_CATEGORIES.filter((categoria) => categoria !== "PLAN_ESTUDIOS").map(
+  ...documentCategoriesForType("PEI")
+    .filter((categoria) => categoria !== "PLAN_ESTUDIOS")
+    .map(
+      (categoria): DocumentCategory => ({
+        id: categoria,
+        type: "PEI",
+        typeName: "Proyecto Educativo Institucional (PEI)",
+        categoria,
+        categoriaName: documentCategoryDisplayName(categoria),
+        status: "PENDIENTE",
+        fileName: null,
+        uploadedAt: null,
+        sizeBytes: null,
+        archivoId: null,
+        downloadUrl: null,
+      }),
+    ),
+  ...documentCategoriesForType("PMI").map(
     (categoria): DocumentCategory => ({
       id: categoria,
-      type: "PEI",
-      typeName: "Proyecto Educativo Institucional (PEI)",
+      type: "PMI",
+      typeName: "Plan de Mejoramiento Institucional (PMI)",
       categoria,
       categoriaName: documentCategoryDisplayName(categoria),
       status: "PENDIENTE",
@@ -151,22 +168,23 @@ export const documentCategoriesDb: DocumentCategory[] = [
 ]
 
 /**
- * "Completa" = al menos 1 archivo, contando por CATEGORÍA (no por fila --
- * "Plan de estudios" con 3 archivos sigue contando 1 de 5, no 3 de 5).
+ * "Completa" = al menos 1 archivo por cada categoría OBLIGATORIA (V521:
+ * "Plan escolar de gestión del riesgo" quedó opcional, no cuenta acá),
+ * contando por CATEGORÍA (no por fila -- "Plan de estudios" con 3
+ * archivos sigue contando 1, no 3).
  */
 function recalcDocumentProgress(type: DocumentType): void {
-  if (type === "PMI") return
-  const rows = documentCategoriesDb.filter((c) => c.type === type)
-  const completedCategorias = new Set(
-    rows.filter((c) => c.fileName !== null).map((c) => c.categoria),
-  )
+  const requeridas = requiredDocumentCategoriesForType(type)
+  const rows = documentCategoriesDb.filter((c) => c.type === type && requeridas.includes(c.categoria))
+  const completadas = new Set(rows.filter((c) => c.fileName !== null).map((c) => c.categoria))
   const document = documentsDb.find((d) => d.type === type)
   if (!document || document.status === "NO_APLICA") return
-  document.completedCategories = completedCategorias.size
-  document.totalCategories = DOCUMENT_CATEGORIES.length
-  document.status = completedCategorias.size === DOCUMENT_CATEGORIES.length ? "COMPLETO" : "PENDIENTE"
+  document.completedCategories = completadas.size
+  document.totalCategories = requeridas.length
+  document.status = completadas.size === requeridas.length ? "COMPLETO" : "PENDIENTE"
 }
 recalcDocumentProgress("PEI")
+recalcDocumentProgress("PMI")
 
 export function findDocumentByType(type: DocumentType): Document | undefined {
   return documentsDb.find((document) => document.type === type)
@@ -195,13 +213,16 @@ export function findDocumentCategoryByArchivo(
 }
 
 /**
- * Todas las filas de un tipo. "Plan de estudios" sin ningún archivo activo
- * agrega una fila PENDIENTE placeholder (mismo criterio que el backend real,
- * V515) para que la categoría siga apareciendo en la pantalla aunque
- * todavía no tenga nada cargado.
+ * Todas las filas de un tipo. "Plan de estudios" (solo PEI/PEC) sin
+ * ningún archivo activo agrega una fila PENDIENTE placeholder (mismo
+ * criterio que el backend real, V515) para que la categoría siga
+ * apareciendo en la pantalla aunque todavía no tenga nada cargado. PMI/PFI
+ * no tienen "Plan de estudios" -- no aplica el placeholder.
  */
 export function listDocumentCategories(type: DocumentType): DocumentCategory[] {
   const rows = documentCategoriesDb.filter((c) => c.type === type)
+  if (type !== "PEI" && type !== "PEC") return rows
+
   const tienePlanEstudios = rows.some((c) => c.categoria === "PLAN_ESTUDIOS")
   if (tienePlanEstudios) return rows
 
@@ -224,67 +245,10 @@ export function listDocumentCategories(type: DocumentType): DocumentCategory[] {
 }
 
 /**
- * Carga (o reemplaza) la versión vigente de PMI — el único tipo que sigue
- * siendo un solo archivo. No se valida tipo mime ni tamaño — eso lo hace
- * `DialogUploadDocument` en el cliente antes de mandar la petición.
- */
-export function uploadDocumentVersion(params: {
-  type: "PMI"
-  fileName: string
-  sizeBytes: number
-}): Document {
-  const existing = findDocumentByType(params.type)
-  const uploadedAt = new Date().toISOString()
-  const archivoId = nextArchivoId()
-
-  const next: Document = {
-    id: params.type,
-    type: params.type,
-    typeName:
-      existing?.typeName ?? DOCUMENT_TYPES.find((t) => t.id === params.type)?.name ?? params.type,
-    status: "COMPLETO",
-    fileName: params.fileName,
-    uploadedAt,
-    sizeBytes: params.sizeBytes,
-    archivoId,
-    downloadUrl: `/api/files/download/${archivoId}`,
-  }
-
-  const index = documentsDb.findIndex((document) => document.type === params.type)
-  if (index >= 0) {
-    documentsDb[index] = next
-  } else {
-    documentsDb.push(next)
-  }
-
-  return next
-}
-
-export function deleteCurrentDocumentVersion(type: "PMI"): Document | undefined {
-  const existing = findDocumentByType(type)
-  if (!existing) return undefined
-
-  const cleared: Document = {
-    ...existing,
-    status: "PENDIENTE",
-    fileName: null,
-    uploadedAt: null,
-    sizeBytes: null,
-  }
-
-  const index = documentsDb.findIndex((document) => document.type === type)
-  if (index >= 0) {
-    documentsDb[index] = cleared
-  }
-
-  return cleared
-}
-
-/**
- * Carga el archivo de UN anexo de PEI/PEC. "Plan de estudios" (V515)
- * SIEMPRE agrega una fila nueva (nunca reemplaza -- admite varios archivos
- * a la vez); las demás categorías siguen reemplazando la única fila
- * vigente, como en V512.
+ * Carga (o reemplaza) el archivo de UN anexo. "Plan de estudios" (V515,
+ * solo PEI/PEC) SIEMPRE agrega una fila nueva (nunca reemplaza -- admite
+ * varios archivos a la vez); las demás categorías (incluida la única de
+ * PMI/PFI) siguen reemplazando la única fila vigente.
  */
 export function uploadDocumentCategoryVersion(params: {
   type: DocumentType
@@ -351,7 +315,7 @@ export function uploadDocumentCategoryVersion(params: {
  * varios archivos por `archivoId` y lo saca de la lista del todo (no
  * "vuelve a PENDIENTE" como las categorías de un solo archivo -- deja de
  * existir esa fila puntual). Las demás categorías siguen limpiando la
- * única fila vigente, como en V512.
+ * única fila vigente.
  */
 export function deleteDocumentCategoryVersion(
   type: DocumentType,
