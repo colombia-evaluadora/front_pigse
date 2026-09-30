@@ -19,12 +19,15 @@ const TYPE_OPTIONS: QueryOption[] = [
   { value: "PEI", label: "PEI" },
   { value: "PEC", label: "PEC" },
   { value: "PMI", label: "PMI" },
+  { value: "PFI", label: "PFI" },
 ]
 
+// Sin "No aplica" (V521): el tipo que no corresponde a un establecimiento
+// ya no llega como fila con ese estado -- el backend lo excluye directo,
+// así que filtrar por ese estado nunca podría traer nada.
 const STATUS_OPTIONS: QueryOption[] = [
   { value: "COMPLETO", label: "Completo" },
   { value: "PENDIENTE", label: "Pendiente" },
-  { value: "NO_APLICA", label: "No aplica" },
 ]
 
 const TYPE_ITEMS = [{ value: "", label: "Todos" }, ...TYPE_OPTIONS]
