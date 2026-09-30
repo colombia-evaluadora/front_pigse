@@ -335,7 +335,16 @@ const appIndexRoute = createRoute({
     const user = context.queryClient.getQueryData<AuthUser>(USER_QUERY_KEY) ?? null
     let firstUrl: string | null = null
     try {
-      const items = await context.queryClient.ensureQueryData(navItemsQueryOptions)
+      // `fetchQuery` con `staleTime: 0`, no `ensureQueryData`: esta decisión
+      // SIEMPRE tiene que pegarle al backend, nunca confiar en el cache de
+      // `navItemsQueryOptions` (`staleTime: Infinity`, pensado para no
+      // repetir el fetch en cada render del sidebar). Una sesión vieja que
+      // ya cacheó el menú antes de un cambio de `role_route` (asignar/sacar
+      // un menú desde "Roles y Menús") podía seguir redirigiendo al ítem
+      // viejo hasta el próximo logout/login — reportado en vivo. El mismo
+      // fetch además refresca la entrada compartida del cache, así que el
+      // sidebar que se pinta después de este redirect ya ve el dato al día.
+      const items = await context.queryClient.fetchQuery({ ...navItemsQueryOptions, staleTime: 0 })
       firstUrl = getFirstNavUrl(items)
     } catch {
       firstUrl = null
