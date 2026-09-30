@@ -27,7 +27,7 @@ import {
 
 import type { VisorSearch } from "@/features/pdf-viewer/api/schema"
 
-const VALID_TYPES = new Set<string>(["PEI", "PEC", "PMI"])
+const VALID_TYPES = new Set<string>(["PEI", "PEC", "PMI", "PFI"])
 
 function isDocumentType(value: string): value is DocumentType {
   return VALID_TYPES.has(value)

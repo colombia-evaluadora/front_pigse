@@ -47,9 +47,10 @@ interface SearchComplianceProps {
  * (`pmi:(Pendiente) valledupar`), y el popover del embudo es solo otra forma
  * de escribir lo mismo.
  *
- * Los tres filtros avanzados —PEI, PEC, PMI— responden a la pregunta real del
- * monitor: "¿quién me debe el PMI?". Buscar por nombre sirve para ir a un EE
- * puntual; filtrar por estado sirve para trabajar la lista de pendientes.
+ * Los cuatro filtros avanzados —PEI, PEC, PMI, PFI— responden a la pregunta
+ * real del monitor: "¿quién me debe el PMI?". Buscar por nombre sirve para ir
+ * a un EE puntual; filtrar por estado sirve para trabajar la lista de
+ * pendientes.
  */
 export function SearchCompliance({
   filters,
@@ -61,15 +62,17 @@ export function SearchCompliance({
   const [draftPei, setDraftPei] = useState(filters.pei[0] ?? "")
   const [draftPec, setDraftPec] = useState(filters.pec[0] ?? "")
   const [draftPmi, setDraftPmi] = useState(filters.pmi[0] ?? "")
+  const [draftPfi, setDraftPfi] = useState(filters.pfi[0] ?? "")
 
   const syntax = useMemo<QuerySyntax<ComplianceFilters>>(
     () => ({
-      empty: { search: "", pei: [], pec: [], pmi: [] },
+      empty: { search: "", pei: [], pec: [], pmi: [], pfi: [] },
       freeText: { key: "texto", field: "search" },
       terms: [
         optionsTerm("pei", "pei", ESTADO_OPTIONS),
         optionsTerm("pec", "pec", ESTADO_OPTIONS),
         optionsTerm("pmi", "pmi", ESTADO_OPTIONS),
+        optionsTerm("pfi", "pfi", ESTADO_OPTIONS),
       ],
     }),
     [],
@@ -88,7 +91,8 @@ export function SearchCompliance({
     setDraftPei(filters.pei[0] ?? "")
     setDraftPec(filters.pec[0] ?? "")
     setDraftPmi(filters.pmi[0] ?? "")
-  }, [open, filters.pei, filters.pec, filters.pmi])
+    setDraftPfi(filters.pfi[0] ?? "")
+  }, [open, filters.pei, filters.pec, filters.pmi, filters.pfi])
 
   function handleApplyAdvanced() {
     // El popover no toca la búsqueda libre: reescribe el resto de la consulta
@@ -99,6 +103,7 @@ export function SearchCompliance({
       pei: draftPei ? [draftPei] : [],
       pec: draftPec ? [draftPec] : [],
       pmi: draftPmi ? [draftPmi] : [],
+      pfi: draftPfi ? [draftPfi] : [],
     })
     setOpen(false)
   }
@@ -124,7 +129,7 @@ export function SearchCompliance({
         onApply={handleApplyAdvanced}
         size="sm"
       >
-        <div className="grid gap-3 px-4 sm:grid-cols-3">
+        <div className="grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4">
           <EstadoField
             id="compliance-pei"
             label="Estado PEI"
@@ -143,13 +148,19 @@ export function SearchCompliance({
             value={draftPmi}
             onChange={setDraftPmi}
           />
+          <EstadoField
+            id="compliance-pfi"
+            label="Estado PFI"
+            value={draftPfi}
+            onChange={setDraftPfi}
+          />
         </div>
       </SearchQueryBar>
     </div>
   )
 }
 
-/** Los tres selectores son idénticos salvo la etiqueta: se arman una vez. */
+/** Los cuatro selectores son idénticos salvo la etiqueta: se arman una vez. */
 function EstadoField({
   id,
   label,
