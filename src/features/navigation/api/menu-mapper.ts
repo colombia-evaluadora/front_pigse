@@ -22,9 +22,14 @@ export interface MenuSource {
  *
  * Dos reglas que salen del dato real:
  *
- * - **Un grupo puede no tener ruta propia** (`path: null` en 26 de las 30
- *   raíces). Hereda la de su primer ítem, que es a donde lleva al abrirlo —
- *   misma convención que usa el alta de menús.
+ * - **Un grupo con hijos SIEMPRE usa la ruta del primer hijo VISIBLE para
+ *   ESTE usuario**, nunca su propio `path` (aunque lo tenga cargado en la
+ *   base — varias raíces lo traen como "default" pensado para el rol con
+ *   más acceso). Con roles que no ven ese hijo "default" pero sí otro, `path`
+ *   propio del grupo apuntaba a una pantalla sin permiso real — reportado en
+ *   vivo, el redirect de `/app` caía ahí para un rol que ni la tenía en el
+ *   sidebar. El `path` propio del grupo solo se usa cuando NO tiene hijos
+ *   navegables (grupo sin children, o con `path` null en todos).
  * - **`visible: false` no se pinta.** Es el interruptor que maneja la pantalla
  *   de configuración de roles y menús; un grupo oculto se lleva a sus ítems.
  *
@@ -47,7 +52,7 @@ export function toNavItemDtos(menus: MenuSource[]): NavItemDto[] {
     .filter((menu) => menu.idParent === null)
     .map((menu): NavItemDto | null => {
       const children = (childrenByParent.get(menu.id) ?? []).filter((child) => child.path)
-      const url = menu.path ?? children[0]?.path ?? null
+      const url = children[0]?.path ?? menu.path ?? null
       if (url === null) return null
 
       return {
