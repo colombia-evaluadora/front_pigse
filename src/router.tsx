@@ -12,7 +12,7 @@ import { paths } from "@/config/paths"
 import { humanizeSlug } from "@/config/breadcrumbs"
 import { hasSession, USER_QUERY_KEY } from "@/lib/auth"
 import type { AuthUser } from "@/lib/auth-mapper"
-import { canAccessPath, findFirstAllowedPath } from "@/lib/auth-routes"
+import { findFirstAllowedPath } from "@/lib/auth-routes"
 import { queryClient } from "@/lib/query-client"
 import { NotFoundPage } from "@/components/layout/not-found-page"
 import { ErrorPage } from "@/components/layout/error-page"
@@ -285,21 +285,15 @@ const appLayoutRoute = createRoute({
       })
     }
 
-    // Después de `hasSession`, el usuario ya está en cache. Resolvemos su
-    // rol del catálogo (id numérico) y, si la ruta actual no está en su
-    // mapa de accesos, lo mandamos a la pantalla "No autorizado" con la URL
-    // original como `from` y la primera ruta permitida como `home`.
-    const user = context.queryClient.getQueryData<AuthUser>(USER_QUERY_KEY) ?? null
-
-    if (!canAccessPath(location.pathname, user)) {
-      throw redirect({
-        to: paths.app.unauthorized.getHref(),
-        search: {
-          from: location.pathname,
-          home: findFirstAllowedPath(user),
-        },
-      })
-    }
+    // Sin gate por rol acá (igual que `front_colombia_evaluadora`): validar
+    // la ruta contra `ROUTE_ACCESS` (`lib/auth-routes.ts`) duplicaba, a mano
+    // y en el cliente, el permiso real de `role_route`/`role_query` del SSO
+    // — las dos tablas podían desincronizarse (un rol con el ítem de menú
+    // asignado en `role_route` pero ausente de `ROUTE_ACCESS`) y entonces
+    // `/app` redirigía al primer ítem real del menú (`getFirstNavUrl`,
+    // abajo) para que ESTE MISMO chequeo lo rebotara a "No autorizado" un
+    // instante después — reportado en vivo. El backend ya rechaza con 403
+    // lo que no corresponda; el front no necesita repetir el gate.
   },
   component: ProtectedLayout,
 })
