@@ -8,10 +8,11 @@
  * - `PENDIENTE` → dot rojo solo (el EE puede/debe cargarlo).
  * - `NO_APLICA` → texto "N/A" sin dot (el EE no aplica para este documento).
  *
- * La exclusividad mutua PEI/PEC sale de la modalidad del EE (ver
- * `pickDocumentState` en `mocks/db/compliance.ts`): un EE de tipo
- * "Institución Educativa" tiene PEI como documento aplicable y PEC como
- * `NO_APLICA`; un EE etnoeducativo, al revés. PMI siempre aplica.
+ * La exclusividad mutua sale de `ETNIAS` del establecimiento (ver
+ * `mocks/db/compliance.ts`): un EE con `ETNIAS='N'` tiene PEI y PMI como
+ * aplicables y PEC/PFI en `NO_APLICA`; un EE con `ETNIAS='S'` (etnoeducativo),
+ * al revés — PEC y PFI aplican, PEI/PMI quedan en `NO_APLICA`. Mismo criterio
+ * que `features/document-management` (V521).
  */
 export interface ComplianceDocumentState {
   status: "COMPLETO" | "PENDIENTE" | "NO_APLICA"
@@ -31,7 +32,7 @@ export interface ComplianceDocumentState {
 }
 
 /** Tipos de documento que se relevan en el tablero. */
-export type DocumentType = "PEI" | "PEC" | "PMI"
+export type DocumentType = "PEI" | "PEC" | "PMI" | "PFI"
 
 /** Una fila de "Detalle por establecimiento". */
 export interface ComplianceRow {
@@ -41,6 +42,7 @@ export interface ComplianceRow {
   pei: ComplianceDocumentState
   pec: ComplianceDocumentState
   pmi: ComplianceDocumentState
+  pfi: ComplianceDocumentState
   /**
    * 0..100 — porcentaje global del EE. Solo cuentan los documentos
    * `COMPLETO`/`PENDIENTE`; los `NO_APLICA` quedan fuera del denominador
@@ -62,6 +64,7 @@ export interface ComplianceMetrics {
   pei: ComplianceMetricBlock
   pec: ComplianceMetricBlock
   pmi: ComplianceMetricBlock
+  pfi: ComplianceMetricBlock
 }
 
 /**
@@ -79,6 +82,7 @@ export interface ComplianceFilters {
   pei: string[]
   pec: string[]
   pmi: string[]
+  pfi: string[]
 }
 
 /** Filtros vacíos: el estado inicial y lo que deja "limpiar todo". */
@@ -87,4 +91,5 @@ export const EMPTY_COMPLIANCE_FILTERS: ComplianceFilters = {
   pei: [],
   pec: [],
   pmi: [],
+  pfi: [],
 }

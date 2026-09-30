@@ -52,14 +52,16 @@ async function fetchComplianceRows(
     return unwrapPaginated(response)
   }
 
-  // El backend espera los tres arrays de estado como top-level BODY.FILTERS.*
-  // (PEI/PEC/PMI) y sorting como un unico objeto -- ver toSingleSort.
+  // El backend espera los cuatro arrays de estado como top-level
+  // BODY.FILTERS.* (PEI/PEC/PMI/PFI) y sorting como un unico objeto -- ver
+  // toSingleSort.
   const body = {
     filters: {
       search: params.filters.search,
       pei: params.filters.pei,
       pec: params.filters.pec,
       pmi: params.filters.pmi,
+      pfi: params.filters.pfi,
     },
     sorting: toSingleSort(params.sorting),
     pageIndex: params.pageIndex,
