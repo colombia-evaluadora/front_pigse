@@ -1,6 +1,6 @@
 "use no memo"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   TableScreen,
@@ -14,11 +14,10 @@ import { Pagination } from "@/components/pagination"
 import { useDataTable } from "@/hooks/use-data-table"
 import { TablePaginationProvider, useTablePagination } from "@/hooks/use-table-pagination"
 import { useUser } from "@/lib/auth"
-import { canWriteDocuments } from "@/lib/auth-routes"
 import { hasAnyRole, PIGSE_ROLES } from "@/lib/auth-mapper"
 
 import { useDocumentsQuery, useAllDocumentsQuery } from "@/features/document-management/api/query/use-documents"
-import { buildOwnColumns, allInstitutionsColumns } from "@/features/document-management/components/table/columns-documents"
+import { ownColumns, allInstitutionsColumns } from "@/features/document-management/components/table/columns-documents"
 import {
   SearchDocuments,
   type DocumentsFilters,
@@ -43,22 +42,20 @@ export function DocumentManagementTable() {
 }
 
 /**
- * Vista de un solo EE (Rector/Secretario sobre su propio establecimiento):
- * solo dos o tres filas (PEI/PEC/PMI), sin paginación, sin buscador. El
- * Rector entra en modo lectura (se oculta la columna de acción); Secretario
- * conserva el flujo completo.
+ * Vista de un solo EE (Rector/Secretario/Administrador sobre su propio
+ * establecimiento): dos filas (el proyecto educativo + el plan de
+ * mejoramiento que le corresponden por `ETNIAS`), sin paginación, sin
+ * buscador. "Ver anexos" es lectura para cualquiera; Subir/Eliminar vive
+ * adentro, en `table-document-categories.tsx`, que sí respeta
+ * `canWriteDocuments` (Rector incluido desde V521).
  */
 function OwnEstablishmentDocumentsTable() {
   const { data: documents = [], isPending, isError, refetch } = useDocumentsQuery()
 
   const establishmentName = documents.find((d) => d.establishmentName)?.establishmentName
-  const userQuery = useUser()
-
-  const isReadOnly = !canWriteDocuments(userQuery.data)
-  const columns = useMemo(() => buildOwnColumns(isReadOnly), [isReadOnly])
 
   const { table } = useDataTable({
-    columns,
+    columns: ownColumns,
     data: documents,
     pageCount: 1,
     pageIndex: 0,

@@ -92,10 +92,19 @@ export const paths = {
       getHref: () => "/app/gestion-documental",
     },
     /**
-     * Anexos de un PEI o PEC puntual (V512): PEI/PEC dejaron de ser un solo
-     * archivo, así que "entrar" a cualquiera de los dos muestra sus 5
-     * categorías fijas. PMI no navega acá — sigue siendo un solo archivo,
-     * se sube/elimina directo desde `gestionDocumental`.
+     * Fecha límite global de "Gestión documental" + excepciones por
+     * establecimiento (V522). Vive bajo `administracion` (no bajo
+     * `gestion-documental`, que ya tiene el param dinámico `$tipo` -- un
+     * segmento fijo "fecha-limite" ahí colisionaría con esa ruta).
+     */
+    gestionDocumentalFechaLimite: {
+      path: "administracion/gestion-documental/fecha-limite",
+      getHref: () => "/app/administracion/gestion-documental/fecha-limite",
+    },
+    /**
+     * Anexos de un tipo puntual: los 4 (PEI/PEC/PMI/PFI, V521) van por
+     * categorías -- "entrar" a cualquiera muestra sus anexos fijos (5 para
+     * PEI/PEC, 1 para PMI/PFI).
      */
     gestionDocumentalDetalle: {
       path: "gestion-documental/$tipo",

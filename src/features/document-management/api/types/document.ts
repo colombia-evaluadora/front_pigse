@@ -2,13 +2,20 @@
  * Tipos de documento institucional que un establecimiento educativo puede
  * cargar en el módulo de Gestión documental.
  *
- * Catálogo cerrado por ahora (PEI, PEC, PMI); si el día de mañana se
- * agrega un nuevo tipo, se agrega acá y se siembra en
- * `mocks/db/documents.ts`. El discriminador (`id` de tipo) es lo que
- * viaja en la URL/ruta — no un id autonumérico de base — porque hay a lo
- * sumo una versión vigente por tipo.
+ * Catálogo cerrado (PEI, PEC, PMI, PFI); si el día de mañana se agrega un
+ * nuevo tipo, se agrega acá y se siembra en `mocks/db/documents.ts`. El
+ * discriminador (`id` de tipo) es lo que viaja en la URL/ruta — no un id
+ * autonumérico de base — porque hay a lo sumo una versión vigente por
+ * tipo.
+ *
+ * PMI/PFI (V521) son el mismo par excluyente que PEI/PEC, solo que para
+ * el plan de mejoramiento/fortalecimiento en vez del proyecto educativo:
+ * PMI aplica a establecimientos regulares (`etnias = 'N'`), PFI a
+ * etnoeducativos (`etnias = 'S'`). El que no aplica no llega a ESTA
+ * lista — el backend ya la filtra (`fn_documentos_listar`), no hace
+ * falta un estado "no aplica" para el tipo que falta.
  */
-export type DocumentType = "PEI" | "PEC" | "PMI"
+export type DocumentType = "PEI" | "PEC" | "PMI" | "PFI"
 
 /**
  * Estado de entrega de un documento para un establecimiento.
@@ -24,9 +31,16 @@ export type DocumentType = "PEI" | "PEC" | "PMI"
  * END
  * ```
  *
- * `NO_APLICA` sale de la MODALIDAD del EE y es excluyente entre PEI y PEC:
- * un establecimiento etnoeducativo (`etnias = 'S'`) entrega PEC y su PEI no
- * aplica; uno regular (`etnias = 'N'`) al revés. El PMI aplica siempre.
+ * `NO_APLICA` sale de la MODALIDAD del EE y es excluyente entre PEI/PEC
+ * (proyecto educativo) y entre PMI/PFI (plan de mejoramiento/
+ * fortalecimiento): un establecimiento etnoeducativo (`etnias = 'S'`)
+ * entrega PEC + PFI, uno regular (`etnias = 'N'`) entrega PEI + PMI.
+ *
+ * V521: el tipo que no aplica ya NO llega como fila con este estado — el
+ * backend lo excluye directo de `fn_documentos_listar`/`_todos`. Sigue
+ * existiendo acá porque `fn_documento_categorias_listar` SÍ puede devolver
+ * una categoría puntual en `NO_APLICA` (si alguien entra a la URL de un
+ * tipo que no le corresponde).
  *
  * No es lo mismo que `PENDIENTE`: pendiente es "falta que lo suban",
  * no-aplica es "este EE no tiene que entregarlo". Por eso no ofrece acción
@@ -84,35 +98,53 @@ export interface Document {
    */
   establishmentName?: string | null
   /**
-   * V512: solo PEI/PEC (`undefined`/`null` en PMI, que no tiene anexos).
-   * PEI/PEC ya NO cuelgan de un archivo propio — `fileName`/`archivoId`/
-   * `downloadUrl` de esta fila quedan siempre `null` — el archivo real vive
-   * en cada uno de sus 5 anexos (`DocumentCategory`, ver
-   * `fn_documento_categorias_listar`). `status` sigue siendo la fuente de
-   * verdad de "completo": COMPLETO exige `completedCategories ===
-   * totalCategories` (ya lo calcula el backend, el front no lo reinventa).
+   * V521: los 4 tipos (antes solo PEI/PEC) cuelgan de anexos por categoría,
+   * nunca de un archivo propio — `fileName`/`archivoId`/`downloadUrl` de
+   * esta fila quedan siempre `null`; el archivo real vive en cada anexo
+   * (`DocumentCategory`, ver `fn_documento_categorias_listar`). `status`
+   * sigue siendo la fuente de verdad de "completo": COMPLETO exige
+   * `completedCategories === totalCategories` (ya lo calcula el backend,
+   * el front no lo reinventa). PEI/PEC: 4 de sus 5 categorías cuentan acá
+   * ("Plan escolar de gestión del riesgo" es opcional, ver
+   * `DOCUMENT_CATEGORIES_BY_TYPE`); PMI/PFI: 1 sola categoría.
    */
   completedCategories?: number | null
   totalCategories?: number | null
 }
 
-/**
- * Anexo dentro de un PEI o PEC (V512): las 5 categorías fijas que exige el
- * negocio, cada una con su propio archivo vigente — mismo modelo de
- * "versión vigente + historial" que antes tenía el documento entero.
- *
- * Catálogo cerrado en código (no en un catálogo de BD): pedido explícito,
- * "fijo son esas 5". Si el día de mañana se agrega una, se agrega acá y en
- * el `CHECK` del backend (`fn_documento_guardar`/`fn_documento_eliminar`).
- */
-export const DOCUMENT_CATEGORIES = [
+/** Las 5 categorías fijas de un PEI/PEC (V512). Catálogo cerrado en código
+ *  (no en uno de BD): pedido explícito, "fijo son esas 5". Si el día de
+ *  mañana se agrega una, se agrega acá y en el `CHECK` del backend
+ *  (`fn_documento_guardar`/`fn_documento_eliminar`). */
+const PEI_PEC_CATEGORIES = [
   "PLAN_ESTUDIOS",
   "SIEE",
   "MANUAL_CONVIVENCIA",
   "PROYECTOS_TRANSVERSALES",
   "PLAN_GESTION_RIESGO",
 ] as const
+
+/** La única categoría de un PMI/PFI (V521): "Autoevaluación institucional". */
+const PMI_PFI_CATEGORIES = ["AUTOEVALUACION_INSTITUCIONAL"] as const
+
+export const DOCUMENT_CATEGORIES = [...PEI_PEC_CATEGORIES, ...PMI_PFI_CATEGORIES] as const
 export type DocumentCategoryCode = (typeof DOCUMENT_CATEGORIES)[number]
+
+/** Qué categorías le corresponden a cada tipo — PEI/PEC comparten las 5 de
+ *  siempre, PMI/PFI solo tienen "Autoevaluación institucional" (V521). */
+export function documentCategoriesForType(type: DocumentType): readonly DocumentCategoryCode[] {
+  return type === "PMI" || type === "PFI" ? PMI_PFI_CATEGORIES : PEI_PEC_CATEGORIES
+}
+
+/**
+ * Categorías que SÍ hacen falta para que el documento quede COMPLETO
+ * (V521): de las 5 de PEI/PEC, "Plan escolar de gestión del riesgo" quedó
+ * opcional — se puede cargar igual, solo que no bloquea el estado del
+ * documento padre. PMI/PFI: su única categoría siempre es obligatoria.
+ */
+export function requiredDocumentCategoriesForType(type: DocumentType): readonly DocumentCategoryCode[] {
+  return documentCategoriesForType(type).filter((categoria) => categoria !== "PLAN_GESTION_RIESGO")
+}
 
 export function documentCategoryDisplayName(categoria: DocumentCategoryCode): string {
   switch (categoria) {
@@ -125,7 +157,12 @@ export function documentCategoryDisplayName(categoria: DocumentCategoryCode): st
     case "PROYECTOS_TRANSVERSALES":
       return "Proyectos pedagógicos transversales"
     case "PLAN_GESTION_RIESGO":
-      return "Plan escolar de gestión del riesgo"
+      // "(opcional)" igual que el nombre que ya manda el backend real
+      // (V521) — se repite acá para que el mock (sin backend real detrás)
+      // muestre lo mismo.
+      return "Plan escolar de gestión del riesgo (opcional)"
+    case "AUTOEVALUACION_INSTITUCIONAL":
+      return "Autoevaluación institucional"
   }
 }
 
@@ -164,13 +201,6 @@ export interface DocumentCategoryMutationResult {
   document: DocumentCategory
 }
 
-/** Forma común de respuesta para las mutaciones (upload/delete). */
-export interface DocumentMutationResult {
-  status: "ok" | "error"
-  message: string
-  document: Document
-}
-
 /**
  * Etiqueta legible del tipo de documento para usar en headers y
  * breadcrumbs. Es la misma que arma el backend (`fn_documento_nombre`)
@@ -185,5 +215,7 @@ export function documentTypeDisplayName(type: DocumentType): string {
       return "Proyecto Educativo Comunitario (PEC)"
     case "PMI":
       return "Plan de Mejoramiento Institucional (PMI)"
+    case "PFI":
+      return "Plan de Fortalecimiento Institucional (PFI)"
   }
 }

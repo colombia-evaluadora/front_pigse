@@ -3,25 +3,31 @@ import { delay, http, HttpResponse } from "msw"
 import {
   documentsDb,
   documentCategoriesDb,
-  findDocumentByType,
   findDocumentCategory,
   findDocumentCategoryByArchivo,
   listDocumentCategories,
-  uploadDocumentVersion,
-  deleteCurrentDocumentVersion,
   uploadDocumentCategoryVersion,
   deleteDocumentCategoryVersion,
 } from "@/mocks/db/documents"
+import {
+  getDocumentDeadline,
+  setDocumentDeadline,
+  saveDocumentDeadlineException,
+  deleteDocumentDeadlineException,
+} from "@/mocks/db/document-deadline"
+import { establishmentsRowsDb } from "@/mocks/db/establishments"
 
-import { DOCUMENT_CATEGORIES } from "@/features/document-management/api/types/document"
+import {
+  DOCUMENT_CATEGORIES,
+  documentCategoriesForType,
+} from "@/features/document-management/api/types/document"
 import type {
   DocumentCategoryCode,
   DocumentCategoryMutationResult,
-  DocumentMutationResult,
   DocumentType,
 } from "@/features/document-management/api/types/document"
 
-const DOCUMENT_TYPE_SET: ReadonlySet<string> = new Set(["PEI", "PEC", "PMI"])
+const DOCUMENT_TYPE_SET: ReadonlySet<string> = new Set(["PEI", "PEC", "PMI", "PFI"])
 const DOCUMENT_CATEGORY_SET: ReadonlySet<string> = new Set(DOCUMENT_CATEGORIES)
 
 function isDocumentType(value: string): value is DocumentType {
@@ -34,11 +40,12 @@ function isDocumentCategoryCode(value: string): value is DocumentCategoryCode {
 
 /**
  * `POST /documents/upload` — recibe el archivo vía `postMultipart`
- * (multipart/form-data). El campo del archivo viaja como `archivo` y el
- * tipo de documento como `tipo` ("PEI" | "PMI"). `file-service` reemplaza
- * el binario por un `pk_tarchivo` antes de reenviar al query-service — en
- * el mock simulamos el contrato ya procesado: solo nos importa el nombre
- * y el peso del archivo.
+ * (multipart/form-data). El campo del archivo viaja como `archivo`, el
+ * tipo de documento como `tipo` (PEI/PEC/PMI/PFI) y la categoría del
+ * anexo como `categoria`. `file-service` reemplaza el binario por un
+ * `pk_tarchivo` antes de reenviar al query-service — en el mock
+ * simulamos el contrato ya procesado: solo nos importa el nombre y el
+ * peso del archivo.
  */
 async function readUploadBody(request: Request) {
   try {
@@ -108,9 +115,9 @@ function buildMockPdf(texto: string): string {
 }
 
 /**
- * Un `archivoId` puede pertenecer a un documento de un solo archivo (PMI) o
- * a un anexo de PEI/PEC (V512) — los handlers de archivo no necesitan saber
- * cuál, solo el `fileName` para armar el PDF de prueba.
+ * Un `archivoId` siempre pertenece a un anexo (V521: los 4 tipos van por
+ * categorías) — los handlers de archivo no necesitan saber de cuál, solo
+ * el `fileName` para armar el PDF de prueba.
  */
 function findFileByArchivoId(archivoId: string | undefined): { fileName: string | null } | undefined {
   return (
@@ -190,10 +197,11 @@ export const documentHandlers = [
   }),
 
   /**
-   * Lista los tipos de documento institucional (PEI, PEC, PMI) con su
-   * estado de entrega vigente. No es paginado: el catálogo es cerrado y
-   * chico, igual que el resto de los listados de tipo de documento del
-   * SSO. Ver `fn_documentos_listar_vigentes` (backend real).
+   * Lista los tipos de documento institucional (PEI/PEC/PMI/PFI, solo los
+   * que aplican a este establecimiento) con su estado de entrega vigente.
+   * No es paginado: el catálogo es cerrado y chico, igual que el resto de
+   * los listados de tipo de documento del SSO. Ver
+   * `fn_documentos_listar_vigentes` (backend real).
    */
   http.get("*/api/documents", async () => {
     await delay(200)
@@ -218,7 +226,7 @@ export const documentHandlers = [
 
     if (!tipo || !isDocumentType(tipo)) {
       return HttpResponse.json(
-        { status: "error", message: "Debe indicar el tipo de documento (PEI, PEC o PMI)." },
+        { status: "error", message: "Debe indicar el tipo de documento (PEI, PEC, PMI o PFI)." },
         { status: 400 },
       )
     }
@@ -237,30 +245,17 @@ export const documentHandlers = [
       )
     }
 
-    // V512: PEI/PEC exigen categoría (uno de los 5 anexos fijos); PMI no
-    // tiene categorías — mismo par de validaciones que `fn_documento_guardar`.
-    if (tipo === "PMI") {
-      if (categoria) {
-        return HttpResponse.json(
-          { status: "error", message: "PMI no tiene categorías." },
-          { status: 400 },
-        )
-      }
-      const document = uploadDocumentVersion({
-        type: "PMI",
-        fileName: archivo.name,
-        sizeBytes: archivo.size,
-      })
-      return HttpResponse.json<DocumentMutationResult>({
-        status: "ok",
-        message: "Documento cargado correctamente.",
-        document,
-      })
-    }
-
+    // V521: los 4 tipos exigen categoría -- mismas validaciones que
+    // `fn_documento_guardar`.
     if (!categoria || !isDocumentCategoryCode(categoria)) {
       return HttpResponse.json(
         { status: "error", message: `Debe indicar la categoría del anexo de ${tipo}.` },
+        { status: 400 },
+      )
+    }
+    if (!documentCategoriesForType(tipo).includes(categoria)) {
+      return HttpResponse.json(
+        { status: "error", message: `${tipo} no admite la categoría ${categoria}.` },
         { status: 400 },
       )
     }
@@ -280,62 +275,15 @@ export const documentHandlers = [
   }),
 
   /**
-   * Elimina la versión vigente de un documento. El archivo no se borra del
-   * historial — pasa a "versiones anteriores" — y el estado vuelve a
-   * PENDIENTE hasta que se suba uno nuevo.
-   */
-  http.patch("*/api/documents/:type", async ({ params }) => {
-    await delay(250)
-
-    const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
-    if (!typeParam || !isDocumentType(typeParam)) {
-      return HttpResponse.json(
-        { status: "error", message: "Tipo de documento inválido." },
-        { status: 400 },
-      )
-    }
-
-    // V512: PEI/PEC ya no se eliminan por acá (son 5 anexos, no un solo
-    // archivo) — ver el handler de `/documents/:type/categories/:categoria`
-    // más abajo. Esta ruta sigue existiendo solo para PMI.
-    if (typeParam !== "PMI") {
-      return HttpResponse.json(
-        { status: "error", message: `${typeParam} requiere indicar la categoría del anexo a eliminar.` },
-        { status: 400 },
-      )
-    }
-
-    const existing = findDocumentByType(typeParam)
-    if (!existing || existing.status === "PENDIENTE") {
-      return HttpResponse.json(
-        { status: "error", message: "El documento no tiene una versión vigente para eliminar." },
-        { status: 404 },
-      )
-    }
-
-    const document = deleteCurrentDocumentVersion(typeParam)
-    if (!document) {
-      return HttpResponse.json(
-        { status: "error", message: "No se pudo eliminar el documento." },
-        { status: 500 },
-      )
-    }
-    return HttpResponse.json<DocumentMutationResult>({
-      status: "ok",
-      message: "Documento eliminado.",
-      document,
-    })
-  }),
-
-  /**
-   * Anexos de un PEI/PEC puntual (V512) — las 5 categorías fijas con su
-   * estado y archivo vigente (si lo hay).
+   * Anexos de un tipo puntual (V521: los 4 tipos van por categorías) —
+   * las categorías fijas que le corresponden (5 para PEI/PEC, 1 para
+   * PMI/PFI) con su estado y archivo vigente (si lo hay).
    */
   http.get("*/api/documents/:type/categories", async ({ params }) => {
     await delay(200)
 
     const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
-    if (!typeParam || typeParam === "PMI" || !isDocumentType(typeParam)) {
+    if (!typeParam || !isDocumentType(typeParam)) {
       return HttpResponse.json({ message: "Tipo de documento inválido." }, { status: 400 })
     }
 
@@ -343,9 +291,9 @@ export const documentHandlers = [
   }),
 
   /**
-   * Elimina UN anexo de PEI/PEC. Mismo criterio que el PATCH de arriba: baja
-   * lógica, el archivo pasa al historial. "Plan de estudios" (V515) exige
-   * `ARCHIVOID` en el body -- admite varios archivos, hay que decir cuál.
+   * Elimina UN anexo. Baja lógica, el archivo pasa al historial. "Plan de
+   * estudios" (V515, solo PEI/PEC) exige `ARCHIVOID` en el body -- admite
+   * varios archivos, hay que decir cuál.
    */
   http.patch("*/api/documents/:type/categories/:categoria", async ({ params, request }) => {
     await delay(250)
@@ -353,7 +301,7 @@ export const documentHandlers = [
     const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
     const categoriaParam = Array.isArray(params.categoria) ? params.categoria[0] : params.categoria
 
-    if (!typeParam || typeParam === "PMI" || !isDocumentType(typeParam)) {
+    if (!typeParam || !isDocumentType(typeParam)) {
       return HttpResponse.json(
         { status: "error", message: "Tipo de documento inválido." },
         { status: 400 },
@@ -411,5 +359,73 @@ export const documentHandlers = [
       message: "Anexo eliminado.",
       document,
     })
+  }),
+
+  /**
+   * Fecha límite global + excepciones activas (V522).
+   */
+  http.get("*/api/documents/deadline", async () => {
+    await delay(150)
+    return HttpResponse.json({ rows: [getDocumentDeadline()] })
+  }),
+
+  /**
+   * Fija (o quita, con `FECHALIMITE: null`) la fecha límite global (V522).
+   */
+  http.patch("*/api/documents/deadline", async ({ request }) => {
+    await delay(200)
+    const body = (await request.json().catch(() => null)) as { FECHALIMITE?: string | null } | null
+    const result = setDocumentDeadline(body?.FECHALIMITE ?? null)
+    return HttpResponse.json({ rows: [result] })
+  }),
+
+  /**
+   * Fija la fecha límite PROPIA de un establecimiento (V522) -- reemplaza
+   * la global para él, no la suma.
+   */
+  http.put("*/api/documents/deadline/exceptions/:establecimiento", async ({ params, request }) => {
+    await delay(200)
+    const idParam = Array.isArray(params.establecimiento)
+      ? params.establecimiento[0]
+      : params.establecimiento
+    const establecimientoId = Number(idParam)
+    const establecimiento = establishmentsRowsDb.find((e) => e.id === establecimientoId)
+
+    if (!establecimiento) {
+      return HttpResponse.json({ message: "Establecimiento no encontrado." }, { status: 404 })
+    }
+
+    const body = (await request.json().catch(() => null)) as { FECHALIMITE?: string } | null
+    if (!body?.FECHALIMITE) {
+      return HttpResponse.json({ message: "Debe indicar la fecha límite." }, { status: 400 })
+    }
+
+    const result = saveDocumentDeadlineException(
+      establecimientoId,
+      establecimiento.name,
+      body.FECHALIMITE,
+    )
+    return HttpResponse.json({ rows: [result] })
+  }),
+
+  /**
+   * Saca la excepción de un establecimiento (V522) -- vuelve a regirse por
+   * la fecha global.
+   */
+  http.patch("*/api/documents/deadline/exceptions/:establecimiento", async ({ params }) => {
+    await delay(200)
+    const idParam = Array.isArray(params.establecimiento)
+      ? params.establecimiento[0]
+      : params.establecimiento
+    const establecimientoId = Number(idParam)
+
+    const removed = deleteDocumentDeadlineException(establecimientoId)
+    if (!removed) {
+      return HttpResponse.json(
+        { message: "Este establecimiento no tiene excepción activa." },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json({ rows: [{ establecimientoId }] })
   }),
 ]

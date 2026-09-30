@@ -126,6 +126,10 @@ const DocumentCategoryDetailPage = lazyRouteComponent(
   () => import("@/features/document-management/pages/document-category-detail-page"),
   "DocumentCategoryDetailPage",
 )
+const DocumentDeadlinePage = lazyRouteComponent(
+  () => import("@/features/document-management/pages/document-deadline-page"),
+  "DocumentDeadlinePage",
+)
 
 const MonitoringCompliancePage = lazyRouteComponent(
   () => import("@/features/monitoring/pages/monitoring-compliance-page"),
@@ -513,14 +517,25 @@ export const gestionDocumentalRoute = createRoute({
   component: DocumentManagementPage,
 })
 
-// Anexos de un PEI o PEC puntual (V512). PMI no tiene categorías: si alguien
-// entra con esa URL a mano, lo mandamos de vuelta al listado en vez de
-// mostrar una pantalla que no resuelve nada.
+export const gestionDocumentalFechaLimiteRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: paths.app.gestionDocumentalFechaLimite.path,
+  staticData: {
+    breadcrumb: [ADMINISTRACION_CRUMB, { label: "Fecha límite de Gestión documental" }],
+  },
+  component: DocumentDeadlinePage,
+})
+
+// Anexos de un tipo puntual (V521: los 4 tipos van por categorías). Si
+// alguien entra con una URL de un tipo inexistente a mano, lo mandamos de
+// vuelta al listado en vez de mostrar una pantalla que no resuelve nada.
+const DOCUMENT_TYPES_WITH_ROUTE = ["PEI", "PEC", "PMI", "PFI"] as const
+
 export const gestionDocumentalDetalleRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: paths.app.gestionDocumentalDetalle.path,
   beforeLoad: ({ params }) => {
-    if (params.tipo !== "PEI" && params.tipo !== "PEC") {
+    if (!DOCUMENT_TYPES_WITH_ROUTE.includes(params.tipo as (typeof DOCUMENT_TYPES_WITH_ROUTE)[number])) {
       throw redirect({ to: paths.app.gestionDocumental.getHref() })
     }
   },
@@ -528,7 +543,7 @@ export const gestionDocumentalDetalleRoute = createRoute({
     breadcrumb: (params: Record<string, string>) => [
       MONITOREO_CRUMB,
       { label: "Gestión documental", to: paths.app.gestionDocumental.getHref() },
-      { label: documentTypeDisplayName(params.tipo as "PEI" | "PEC") },
+      { label: documentTypeDisplayName(params.tipo as "PEI" | "PEC" | "PMI" | "PFI") },
     ],
   },
   component: DocumentCategoryDetailPage,
@@ -594,6 +609,7 @@ const routeTree = rootRoute.addChildren([
     ]),
     gestionDocumentalRoute,
     gestionDocumentalDetalleRoute,
+    gestionDocumentalFechaLimiteRoute,
     monitoreoCumplimientoRoute,
     visorRoute,
     unauthorizedRoute,
