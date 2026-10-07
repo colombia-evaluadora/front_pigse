@@ -20,6 +20,7 @@ import { paths } from "@/config/paths"
 import { FilterAuditTablesForm } from "@/features/administration/audits/components/forms/form-filter-audit-tables"
 import { useAuditTablesFilters } from "@/features/administration/audits/hooks/use-audit-tables-filters"
 import { useAuditTablesQuery } from "@/features/administration/audits/api/query/use-audit-tables-query"
+import { getErrorMessage } from "@/lib/api-client"
 
 const FILTER_AUDIT_TABLES_FORM_ID = "filter-audit-tables-form"
 
@@ -31,7 +32,7 @@ const viewLinks = [
 export function AuditTablesDataTable() {
   const { pageIndex, pageSize, goToPage, setPageSize } = useTablePagination()
   const { filters, queryFilters, applyFilters } = useAuditTablesFilters()
-  const { data, isPending, isError, refetch } = useAuditTablesQuery({
+  const { data, isPending, isError, error, refetch } = useAuditTablesQuery({
     filters: queryFilters,
     sorting: [],
     pageIndex,
@@ -82,7 +83,7 @@ export function AuditTablesDataTable() {
   if (isError) {
     return (
       <p className="text-sm text-muted-foreground">
-        Ocurrió un error al cargar las tablas.{" "}
+        {getErrorMessage(error)}{" "}
         <button
           type="button"
           onClick={() => refetch()}

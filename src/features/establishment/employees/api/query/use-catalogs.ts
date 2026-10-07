@@ -1,3 +1,4 @@
+import Axios from "axios"
 import { useQuery } from "@tanstack/react-query"
 
 import { env } from "@/config/env"
@@ -143,7 +144,10 @@ async function getRealCatalog<T>(catalog: CatalogSlug): Promise<T[]> {
       code: row.valor,
       name: row.nombre,
     })) as T[]
-  } catch {
+  } catch (error) {
+    // Un 403 se deja pasar tal cual: `getErrorMessage` lo traduce a "El
+    // usuario no tiene permisos." en vez del genérico de abajo.
+    if (Axios.isAxiosError(error) && error.response?.status === 403) throw error
     throw new Error(`No fue posible obtener ${friendly}`)
   }
 }

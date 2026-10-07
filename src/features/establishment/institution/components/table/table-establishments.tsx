@@ -73,7 +73,7 @@ export function EstablishmentsDataTable({ title, action }: EstablishmentsDataTab
   // `queryFilters.status` ya trae el `id` (como texto, ver
   // search-establishments.tsx) — `useEstablishmentsQuery` solo necesita
   // convertirlo a número, no resolverlo contra ningún catálogo.
-  const { data, isPending, isError, refetch } = useEstablishmentsQuery({
+  const { data, isPending, isError, error, refetch } = useEstablishmentsQuery({
     filters: queryFilters,
     sorting,
     pageIndex,
@@ -182,7 +182,7 @@ export function EstablishmentsDataTable({ title, action }: EstablishmentsDataTab
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar los establecimientos."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
 
         {data && (

@@ -23,6 +23,7 @@ import { OPERATION_TYPE_BADGE } from "@/features/administration/audits/api/ui-ma
 import { OperationChangesTable } from "@/features/administration/audits/components/table/operation-changes-table"
 import { DialogConfirmRevertChanges } from "@/features/administration/audits/components/dialogs/dialog-confirm-revert-changes"
 import { useParams } from "@tanstack/react-router"
+import { getErrorMessage } from "@/lib/api-client"
 
 interface ViewOperationChangesDialogProps {
   operationId: string
@@ -42,7 +43,7 @@ export function ViewOperationChangesDialog({
 
   const [showAll, setShowAll] = useState(false)
 
-  const { data, isPending, isError } = useOperationChangesQuery({
+  const { data, isPending, isError, error } = useOperationChangesQuery({
     tableSlug,
     operationId,
     showAll,
@@ -133,7 +134,7 @@ export function ViewOperationChangesDialog({
 
         {isError && (
           <div className="text-red px-6 py-8 text-center text-sm">
-            Ocurrió un error al cargar los cambios.
+            {getErrorMessage(error)}
           </div>
         )}
 

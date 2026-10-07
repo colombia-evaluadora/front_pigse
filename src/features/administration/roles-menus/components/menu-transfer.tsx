@@ -12,9 +12,11 @@ import {
   PencilIcon,
   TrashIcon,
 } from "@/components/ui/icons"
+import { useNotify } from "@/components/notice/notice-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getNavIcon } from "@/features/navigation/api/ui-mappings"
+import { getErrorMessage } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 
 import { useReorderMenus } from "@/features/administration/roles-menus/api/mutations/reorder-menus"
@@ -22,10 +24,7 @@ import type {
   MenuNode,
   MenuTreeNode,
 } from "@/features/administration/roles-menus/api/types/role-menu"
-import {
-  reorderAssignedMenus,
-  reorderSiblings,
-} from "@/features/administration/roles-menus/api/types/role-menu"
+import { reorderSiblings } from "@/features/administration/roles-menus/api/types/role-menu"
 import { DialogDeleteMenu } from "@/features/administration/roles-menus/components/dialog-delete-menu"
 import { DialogSaveMenu } from "@/features/administration/roles-menus/components/dialog-save-menu"
 
@@ -257,17 +256,11 @@ function MoveButton({
   )
 }
 
-/** De qué panel sale el arrastre; decide qué orden se está editando. */
-type Panel = "available" | "assigned"
-
 interface MenuTransferProps {
   tree: MenuTreeNode[]
-  /** Menús del rol, EN EL ORDEN EN QUE LOS VE: la lista es el orden. */
   assignedIds: number[]
   onAssign: (ids: number[]) => void
   onUnassign: (ids: number[]) => void
-  /** Nueva lista de asignados tras arrastrar en el panel derecho. */
-  onReorderAssigned: (ids: number[]) => void
   disabled?: boolean
 }
 
@@ -286,7 +279,6 @@ export function MenuTransfer({
   assignedIds,
   onAssign,
   onUnassign,
-  onReorderAssigned,
   disabled,
 }: MenuTransferProps) {
   const [availableSearch, setAvailableSearch] = useState("")
@@ -300,94 +292,72 @@ export function MenuTransfer({
   const [menuBeingEdited, setMenuBeingEdited] = useState<MenuNode | MenuTreeNode | "new" | null>(
     null,
   )
-  // Arrastre en curso: el menú agarrado y la fila sobre la que caería. Va con
-  // el panel del que salió porque el mismo menú está listado de los dos lados:
-  // sin eso, arrastrar en uno abría el hueco también en el otro, y son dos
-  // órdenes distintos.
-  const [dragged, setDragged] = useState<{ node: MenuNode; panel: Panel } | null>(null)
+  // Arrastre en curso: el menú agarrado y la fila sobre la que caería. Solo el
+  // panel de disponibles se puede arrastrar (ver comentario de `assignedGroups`
+  // más abajo), así que no hace falta llevar de qué panel salió.
+  const [dragged, setDragged] = useState<MenuNode | null>(null)
   const [dropTargetId, setDropTargetId] = useState<number | null>(null)
 
-  const reorderMenus = useReorderMenus()
+  const { notify } = useNotify()
+  const reorderMenus = useReorderMenus({
+    mutationConfig: { onError: (error) => notify(getErrorMessage(error), { variant: "error" }) },
+  })
 
   const assigned = useMemo(() => new Set(assignedIds), [assignedIds])
 
   // El panel de la izquierda muestra el catálogo en su propio orden
-  // (`menuOrder`, el que ya trae `buildMenuTree`).
+  // (`menuOrder`, el que ya trae `buildMenuTree`) y es el único que se puede
+  // reordenar.
   const availableGroups = filterTree(tree, availableSearch)
 
-  // El de la derecha, en cambio, va en el orden DEL ROL: la posición de cada
-  // menú dentro de la lista de asignados. Son dos órdenes independientes.
-  const positionInRole = (id: number) => {
-    const index = assignedIds.indexOf(id)
-    return index === -1 ? Number.MAX_SAFE_INTEGER : index
-  }
+  // El de la derecha se limita a filtrar el mismo árbol a lo que el rol tiene
+  // asignado: el orden ES el del catálogo, sin un orden propio del rol. Antes
+  // el panel de asignados se podía reordenar por su cuenta (arrastre propio,
+  // guardado como la posición dentro de `assignedIds`), pero eso duplicaba la
+  // lógica de orden en el front y en el back para algo que el catálogo ya
+  // resuelve: si un menú necesita otro lugar, se reordena una sola vez desde
+  // "Menús disponibles" y el cambio se ve en los dos paneles.
   const assignedGroups = filterTree(tree, assignedSearch)
     .map(({ group, children }) => ({
       group,
-      children: children
-        .filter((child) => assigned.has(child.id))
-        .sort((a, b) => positionInRole(a.id) - positionInRole(b.id)),
+      children: children.filter((child) => assigned.has(child.id)),
     }))
     .filter(({ group, children }) => assigned.has(group.id) || children.length > 0)
-    .sort((a, b) => positionInRole(a.group.id) - positionInRole(b.group.id))
 
-  // Los grupos que cada panel tiene a la vista: es entre ellos que se
-  // reordena, aunque el `menuOrder` que se guarda sea el de la lista completa.
+  // Los grupos que el panel de disponibles tiene a la vista: es entre ellos
+  // que se reordena, aunque el `menuOrder` que se guarda sea el de la lista
+  // completa.
   const availableGroupIds = availableGroups.map(({ group }) => group.id)
-  const assignedGroupIds = assignedGroups.map(({ group }) => group.id)
 
   /**
-   * Mueve `node` al lugar de `target`. Solo entre hermanos: mover un ítem a
-   * otro grupo sería cambiarle el padre, que es una edición (el diálogo), no un
-   * reordenamiento.
-   *
-   * Cada panel guarda en otro lado, porque son dos órdenes distintos: a la
-   * izquierda se reordena el CATÁLOGO (el `menuOrder` de cada menú, común a
-   * todos los roles); a la derecha, el orden en que ESTE rol ve su menú, que es
-   * el de su lista de asignados.
+   * Mueve `node` al lugar de `target` dentro del catálogo. Solo entre
+   * hermanos: mover un ítem a otro grupo sería cambiarle el padre, que es una
+   * edición (el diálogo), no un reordenamiento.
    */
-  function applyMove(
-    node: MenuNode,
-    target: MenuNode,
-    panel: Panel,
-    siblings: MenuNode[],
-    visibleIds: number[],
-  ) {
+  function applyMove(node: MenuNode, target: MenuNode, siblings: MenuNode[], visibleIds: number[]) {
     if (node.id === target.id || node.idParent !== target.idParent) return
-
-    if (panel === "assigned") {
-      const next = reorderAssignedMenus(assignedIds, tree, node.id, target.id)
-      if (next !== assignedIds) onReorderAssigned(next)
-      return
-    }
 
     const items = reorderSiblings(siblings, visibleIds, node.id, target.id)
     if (items.length > 0) reorderMenus.mutate(items)
   }
 
   /** Flechas del teclado: mueve un lugar arriba o abajo entre los visibles. */
-  function moveBy(
-    node: MenuNode,
-    direction: -1 | 1,
-    panel: Panel,
-    siblings: MenuNode[],
-    visibleIds: number[],
-  ) {
+  function moveBy(node: MenuNode, direction: -1 | 1, siblings: MenuNode[], visibleIds: number[]) {
     const targetId = visibleIds[visibleIds.indexOf(node.id) + direction]
     const target = siblings.find((it) => it.id === targetId)
     if (!target) return
-    applyMove(node, target, panel, siblings, visibleIds)
+    applyMove(node, target, siblings, visibleIds)
   }
 
-  /** Hace arrastrable a la fila de `node`, como origen del panel `panel`. */
-  function dragProps(node: MenuNode, panel: Panel): DragProps {
+  /** Hace arrastrable a la fila de `node`, en el panel de disponibles. */
+  function dragProps(node: MenuNode): DragProps {
     return {
       draggable: true,
       onDragStart: (event: DragEvent<HTMLLIElement>) => {
         event.dataTransfer.effectAllowed = "move"
         // Firefox no arranca el arrastre si no hay datos en el evento.
         event.dataTransfer.setData("text/plain", node.name)
-        setDragged({ node, panel })
+        setDragged(node)
       },
       onDragEnd: () => {
         setDragged(null)
@@ -399,12 +369,11 @@ export function MenuTransfer({
   /** Zona de drop de una fila: la fila entera acepta el menú arrastrado. */
   function dropProps(
     target: MenuNode,
-    panel: Panel,
     siblings: MenuNode[],
     visibleIds: number[],
   ): DropProps | undefined {
-    if (!dragged || dragged.panel !== panel) return undefined
-    if (dragged.node.idParent !== target.idParent) return undefined
+    if (!dragged) return undefined
+    if (dragged.idParent !== target.idParent) return undefined
     return {
       // Sin `preventDefault` el navegador no considera la fila zona de drop.
       // El `stopPropagation` es por el contenedor del acordeón, que repite
@@ -419,7 +388,7 @@ export function MenuTransfer({
       onDrop: (event: DragEvent<HTMLLIElement>) => {
         event.preventDefault()
         event.stopPropagation()
-        if (dragged) applyMove(dragged.node, target, panel, siblings, visibleIds)
+        if (dragged) applyMove(dragged, target, siblings, visibleIds)
         setDragged(null)
         setDropTargetId(null)
       },
@@ -431,14 +400,10 @@ export function MenuTransfer({
    * de más abajo, abajo si viene de más arriba. Es el lugar exacto en el que va
    * a quedar.
    */
-  function ghostSide(
-    target: MenuNode,
-    panel: Panel,
-    visibleIds: number[],
-  ): "before" | "after" | null {
-    if (!dragged || dragged.panel !== panel || dropTargetId !== target.id) return null
-    if (dragged.node.idParent !== target.idParent) return null
-    const from = visibleIds.indexOf(dragged.node.id)
+  function ghostSide(target: MenuNode, visibleIds: number[]): "before" | "after" | null {
+    if (!dragged || dropTargetId !== target.id) return null
+    if (dragged.idParent !== target.idParent) return null
+    const from = visibleIds.indexOf(dragged.id)
     const to = visibleIds.indexOf(target.id)
     if (from === -1 || to === -1 || from === to) return null
     return from > to ? "before" : "after"
@@ -517,8 +482,8 @@ export function MenuTransfer({
               const isCollapsed = !expanded.includes(group.id)
               const isAssigned = assigned.has(group.id)
               const visibleChildIds = children.map((child) => child.id)
-              const groupDrop = dropProps(group, "available", tree, availableGroupIds)
-              const ghost = ghostSide(group, "available", availableGroupIds)
+              const groupDrop = dropProps(group, tree, availableGroupIds)
+              const ghost = ghostSide(group, availableGroupIds)
               return (
                 <Fragment key={group.id}>
                   {ghost === "before" && groupDrop && <GhostSlot depth={0} dropProps={groupDrop} />}
@@ -543,17 +508,13 @@ export function MenuTransfer({
                           isAssigned || disabled ? undefined : (
                             <DragHandle
                               label={group.name}
-                              onMove={(direction) =>
-                                moveBy(group, direction, "available", tree, availableGroupIds)
-                              }
+                              onMove={(direction) => moveBy(group, direction, tree, availableGroupIds)}
                             />
                           )
                         }
-                        isDragging={dragged?.node.id === group.id && dragged.panel === "available"}
+                        isDragging={dragged?.id === group.id}
                         dropProps={groupDrop}
-                        dragProps={
-                          isAssigned || disabled ? undefined : dragProps(group, "available")
-                        }
+                        dragProps={isAssigned || disabled ? undefined : dragProps(group)}
                         extra={
                           children.length > 0 && (
                             <Button
@@ -588,13 +549,8 @@ export function MenuTransfer({
                       {!isCollapsed &&
                         children.map((child) => {
                           const childAssigned = assigned.has(child.id)
-                          const childDrop = dropProps(
-                            child,
-                            "available",
-                            group.children,
-                            visibleChildIds,
-                          )
-                          const childGhost = ghostSide(child, "available", visibleChildIds)
+                          const childDrop = dropProps(child, group.children, visibleChildIds)
+                          const childGhost = ghostSide(child, visibleChildIds)
                           return (
                             <Fragment key={child.id}>
                               {childGhost === "before" && childDrop && (
@@ -614,26 +570,14 @@ export function MenuTransfer({
                                     <DragHandle
                                       label={child.name}
                                       onMove={(direction) =>
-                                        moveBy(
-                                          child,
-                                          direction,
-                                          "available",
-                                          group.children,
-                                          visibleChildIds,
-                                        )
+                                        moveBy(child, direction, group.children, visibleChildIds)
                                       }
                                     />
                                   )
                                 }
-                                isDragging={
-                                  dragged?.node.id === child.id && dragged.panel === "available"
-                                }
+                                isDragging={dragged?.id === child.id}
                                 dropProps={childDrop}
-                                dragProps={
-                                  childAssigned || disabled
-                                    ? undefined
-                                    : dragProps(child, "available")
-                                }
+                                dragProps={childAssigned || disabled ? undefined : dragProps(child)}
                                 action={
                                   !childAssigned && !disabled ? (
                                     <MoveButton
@@ -681,122 +625,60 @@ export function MenuTransfer({
           <ul className="border-t border-border">
             {assignedGroups.map(({ group, children }) => {
               const isCollapsed = !expanded.includes(group.id)
-              const visibleChildIds = children.map((child) => child.id)
-              const groupDrop = dropProps(group, "assigned", tree, assignedGroupIds)
-              const ghost = ghostSide(group, "assigned", assignedGroupIds)
               return (
-                <Fragment key={group.id}>
-                  {ghost === "before" && groupDrop && <GhostSlot depth={0} dropProps={groupDrop} />}
-                  {/* El contenedor repite la zona de drop del grupo: su padding
-                      es un par de píxeles donde el drop se perdía. */}
-                  <li {...groupDrop} className="border-b border-border py-1 last:border-b-0">
-                    <ul>
-                      <MenuRow
-                        node={group}
-                        depth={0}
-                        // Acá el grupo sí está activo —es el panel que lo
-                        // administra—, así que es el lado desde el que se
-                        // reordena el menú DEL ROL.
-                        handle={
-                          disabled ? undefined : (
-                            <DragHandle
-                              label={group.name}
-                              onMove={(direction) =>
-                                moveBy(group, direction, "assigned", tree, assignedGroupIds)
-                              }
-                            />
-                          )
-                        }
-                        isDragging={dragged?.node.id === group.id && dragged.panel === "assigned"}
-                        dropProps={groupDrop}
-                        dragProps={disabled ? undefined : dragProps(group, "assigned")}
-                        extra={
-                          children.length > 0 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              color="muted"
-                              size="icon"
-                              className="size-7 [&_svg:not([class*='size-'])]:size-5"
-                              onClick={() => toggleCollapsed(group.id)}
-                            >
-                              <span className="sr-only">
-                                {isCollapsed ? "Mostrar" : "Ocultar"} los menús de {group.name}
-                              </span>
-                              {isCollapsed ? <CaretDownIcon /> : <CaretUpIcon />}
-                            </Button>
-                          )
-                        }
-                        action={
-                          disabled ? undefined : (
-                            <MoveButton
-                              direction="unassign"
-                              // Quitar el grupo se lleva sus ítems: si no, quedarían
-                              // sin dónde colgarse.
-                              label={`Quitar ${group.name}`}
-                              onClick={() => unassignGroup(group)}
-                            />
-                          )
-                        }
-                      />
-                      {!isCollapsed &&
-                        children.map((child) => {
-                          const childDrop = dropProps(
-                            child,
-                            "assigned",
-                            group.children,
-                            visibleChildIds,
-                          )
-                          const childGhost = ghostSide(child, "assigned", visibleChildIds)
-                          return (
-                            <Fragment key={child.id}>
-                              {childGhost === "before" && childDrop && (
-                                <GhostSlot depth={1} dropProps={childDrop} />
-                              )}
-                              <MenuRow
-                                node={child}
-                                depth={1}
-                                handle={
-                                  disabled ? undefined : (
-                                    <DragHandle
-                                      label={child.name}
-                                      onMove={(direction) =>
-                                        moveBy(
-                                          child,
-                                          direction,
-                                          "assigned",
-                                          group.children,
-                                          visibleChildIds,
-                                        )
-                                      }
-                                    />
-                                  )
-                                }
-                                isDragging={
-                                  dragged?.node.id === child.id && dragged.panel === "assigned"
-                                }
-                                dropProps={childDrop}
-                                dragProps={disabled ? undefined : dragProps(child, "assigned")}
-                                action={
-                                  disabled ? undefined : (
-                                    <MoveButton
-                                      direction="unassign"
-                                      label={`Quitar ${child.name}`}
-                                      onClick={() => onUnassign([child.id])}
-                                    />
-                                  )
-                                }
+                <li key={group.id} className="border-b border-border py-1 last:border-b-0">
+                  <ul>
+                    <MenuRow
+                      node={group}
+                      depth={0}
+                      extra={
+                        children.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            color="muted"
+                            size="icon"
+                            className="size-7 [&_svg:not([class*='size-'])]:size-5"
+                            onClick={() => toggleCollapsed(group.id)}
+                          >
+                            <span className="sr-only">
+                              {isCollapsed ? "Mostrar" : "Ocultar"} los menús de {group.name}
+                            </span>
+                            {isCollapsed ? <CaretDownIcon /> : <CaretUpIcon />}
+                          </Button>
+                        )
+                      }
+                      action={
+                        disabled ? undefined : (
+                          <MoveButton
+                            direction="unassign"
+                            // Quitar el grupo se lleva sus ítems: si no, quedarían
+                            // sin dónde colgarse.
+                            label={`Quitar ${group.name}`}
+                            onClick={() => unassignGroup(group)}
+                          />
+                        )
+                      }
+                    />
+                    {!isCollapsed &&
+                      children.map((child) => (
+                        <MenuRow
+                          key={child.id}
+                          node={child}
+                          depth={1}
+                          action={
+                            disabled ? undefined : (
+                              <MoveButton
+                                direction="unassign"
+                                label={`Quitar ${child.name}`}
+                                onClick={() => onUnassign([child.id])}
                               />
-                              {childGhost === "after" && childDrop && (
-                                <GhostSlot depth={1} dropProps={childDrop} />
-                              )}
-                            </Fragment>
-                          )
-                        })}
-                    </ul>
-                  </li>
-                  {ghost === "after" && groupDrop && <GhostSlot depth={0} dropProps={groupDrop} />}
-                </Fragment>
+                            )
+                          }
+                        />
+                      ))}
+                  </ul>
+                </li>
               )
             })}
           </ul>
