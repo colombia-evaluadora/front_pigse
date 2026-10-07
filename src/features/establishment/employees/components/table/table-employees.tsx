@@ -60,7 +60,7 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
   const { data: roles = [] } = useEmployeeRolesQuery()
   const { data: workSchedules = [] } = useCatalogQuery<CatalogItem>(CATALOGS.WORK_SCHEDULES)
 
-  const { data, isPending, isError, refetch } = useEmployeesQuery({
+  const { data, isPending, isError, error, refetch } = useEmployeesQuery({
     filters: queryFilters,
     sorting,
     pageIndex,
@@ -173,7 +173,7 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar los funcionarios."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
 
         {data && (

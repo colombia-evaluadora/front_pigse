@@ -22,6 +22,7 @@ import { SearchSessionOperations } from "@/features/administration/audits/compon
 import { ExportSelectedSessionOperationsDialog } from "@/features/administration/audits/components/dialogs/dialog-export-selected-session-operations"
 import { ExportSessionOperationsDialog } from "@/features/administration/audits/components/dialogs/dialog-export-session-operations"
 import { ClearSelectionSessionOperationsDialog } from "@/features/administration/audits/components/dialogs/dialog-clear-selection-session-operations"
+import { getErrorMessage } from "@/lib/api-client"
 
 interface SessionOperationsDataTableProps {
   sessionId: string
@@ -39,7 +40,7 @@ export function SessionOperationsDataTable({
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useSessionOperationsFilters()
 
-  const { data, isPending, isError, refetch } = useSessionOperationsQuery({
+  const { data, isPending, isError, error, refetch } = useSessionOperationsQuery({
     sessionId,
     filters: queryFilters,
     sorting,
@@ -96,7 +97,7 @@ export function SessionOperationsDataTable({
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar las operaciones."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
         {data && (
           <Pagination

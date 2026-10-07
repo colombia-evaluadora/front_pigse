@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { useNavItemsQuery } from "@/features/navigation/api/query/use-nav-items-query"
 import type { NavMaxLines, NavSubItem } from "@/features/navigation/api/types/nav-item"
 import type { Icon } from "@/components/ui/icons"
+import { getErrorMessage } from "@/lib/api-client"
 
 /**
  * `maxLines` viene de la API (ver `NavMaxLines`): cuántas líneas se ven de la
@@ -74,7 +75,7 @@ function resolveNavPathname(pathname: string) {
 }
 
 export function NavMain() {
-  const { data: items, isPending, isError, refetch } = useNavItemsQuery()
+  const { data: items, isPending, isError, error, refetch } = useNavItemsQuery()
   const pathname = resolveNavPathname(useLocation().pathname)
 
   /**
@@ -111,7 +112,7 @@ export function NavMain() {
     return (
       <SidebarGroup>
         <div className="px-2 py-1.5 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
-          Ocurrió un error al cargar el menú.{" "}
+          {getErrorMessage(error)}{" "}
           <Button size="sm" variant="link" className="h-auto p-0" onClick={() => refetch()}>
             Reintentar
           </Button>

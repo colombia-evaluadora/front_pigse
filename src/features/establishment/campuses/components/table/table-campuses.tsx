@@ -56,7 +56,7 @@ export function CampusesDataTable({ onEditCampus, title, action }: CampusesDataT
   // (ver `dialog-manage.tsx`).
   const { data: zones = [] } = useCatalogQuery<CatalogItem>(CATALOGS.ZONES)
 
-  const { data, isPending, isError, refetch } = useCampusesQuery({
+  const { data, isPending, isError, error, refetch } = useCampusesQuery({
     filters: queryFilters,
     sorting,
     pageIndex,
@@ -170,7 +170,7 @@ export function CampusesDataTable({ onEditCampus, title, action }: CampusesDataT
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar las sedes."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
 
         {data && (

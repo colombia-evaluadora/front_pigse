@@ -26,6 +26,7 @@ import { ExportTableOperationsDialog } from "@/features/administration/audits/co
 import { ClearSelectionTableOperationsDialog } from "@/features/administration/audits/components/dialogs/dialog-clear-selection-table-operations"
 import { TableOperationsStatsCards } from "@/features/administration/audits/components/stats/table-operations-stats-cards"
 import { useParams } from "@tanstack/react-router"
+import { getErrorMessage } from "@/lib/api-client"
 
 interface TableOperationsDataTableProps {
   title: ReactNode
@@ -38,7 +39,7 @@ export function TableOperationsDataTable({ title, action }: TableOperationsDataT
   const { pageIndex, pageSize, goToPage, setPageSize, sorting, setSorting } = useTablePagination()
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useTableOperationsFilters()
-  const { data, isPending, isError, refetch } = useTableOperationsQuery({
+  const { data, isPending, isError, error, refetch } = useTableOperationsQuery({
     tableSlug,
     filters: queryFilters,
     sorting,
@@ -116,7 +117,7 @@ export function TableOperationsDataTable({ title, action }: TableOperationsDataT
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar las operaciones."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
         {data && (
           <Pagination
