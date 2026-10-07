@@ -26,6 +26,7 @@ import { ExportSelectedAuditSessionDialog } from "@/features/administration/audi
 import { ExportAuditSessionDialog } from "@/features/administration/audits/components/dialogs/dialog-export-audit-session"
 import { ClearSelectionAuditSessionDialog } from "@/features/administration/audits/components/dialogs/dialog-clear-selection-audit-session"
 import { AuditSessionStatsCards } from "@/features/administration/audits/components/stats/audit-session-stats-cards"
+import { getErrorMessage } from "@/lib/api-client"
 
 const viewLinks = [
   { label: "Por sesión", to: paths.app.auditoriaSesiones.getHref() },
@@ -36,7 +37,7 @@ export function AuditSessionDataTable() {
   const { pageIndex, pageSize, goToPage, setPageSize, sorting, setSorting } = useTablePagination()
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useAuditSessionFilters()
-  const { data, isPending, isError, refetch } = useAuditsQuery({
+  const { data, isPending, isError, error, refetch } = useAuditsQuery({
     filters: queryFilters,
     sorting,
     pageIndex,
@@ -110,7 +111,7 @@ export function AuditSessionDataTable() {
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar las sesiones."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
         {data && (
           <Pagination

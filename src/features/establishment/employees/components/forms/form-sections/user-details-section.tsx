@@ -384,16 +384,15 @@ export function UserDetailsForm({
             placeholder="Agregar"
             // TUSUARIO.IDENTIFICACION es VARCHAR(30) puramente
             // numérico (RegisterUsuarioRequest la valida igual,
-            // @Size(max=30)) — solo dígitos, sin letras. Acotado a 11
-            // acá: ningún documento colombiano (CC, TI, CE, NIT de
-            // persona) supera esa longitud.
+            // @Size(max=30)) — solo dígitos, sin letras. Acotado a 15
+            // acá, igual que en Colombia Evaluadora.
             inputMode="numeric"
-            maxLength={11}
+            maxLength={15}
             value={person.identification}
             aria-invalid={isInvalid(`${fieldPrefix}.identification`)}
             onChange={(event) => {
               isUserEditingDocument.current = true
-              emitChange({ identification: toDigitsOnly(event.target.value, 11) })
+              emitChange({ identification: toDigitsOnly(event.target.value, 15) })
             }}
           />
           <FieldError>{errorFor(`${fieldPrefix}.identification`)}</FieldError>

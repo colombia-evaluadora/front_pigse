@@ -62,6 +62,14 @@ export interface PasswordRule {
   test: (value: string) => boolean
 }
 
+/**
+ * Caracteres que el backend (sso, `PasswordPolicy.SPECIAL_CHARS`) cuenta
+ * como "especiales". Debe ser EXACTAMENTE la misma lista: con la regla
+ * anterior (`/[^A-Za-z0-9]/`) el front daba por válida una contraseña con
+ * ñ, tildes o espacios que el backend después rechazaba.
+ */
+export const PASSWORD_SPECIAL_CHARS = "!@#$%^&*()-_=+[]{};:,.<>?/|~"
+
 export const passwordRules: readonly PasswordRule[] = [
   {
     label: "Al menos 8 caracteres",
@@ -84,9 +92,9 @@ export const passwordRules: readonly PasswordRule[] = [
     test: (v) => /\d/.test(v),
   },
   {
-    label: "Un caracter especial (símbolo)",
-    message: "Debe incluir al menos un caracter especial.",
-    test: (v) => /[^A-Za-z0-9]/.test(v),
+    label: `Un caracter especial (${PASSWORD_SPECIAL_CHARS})`,
+    message: `Debe incluir al menos uno de estos caracteres especiales: ${PASSWORD_SPECIAL_CHARS}`,
+    test: (v) => [...v].some((c) => PASSWORD_SPECIAL_CHARS.includes(c)),
   },
 ] as const
 
