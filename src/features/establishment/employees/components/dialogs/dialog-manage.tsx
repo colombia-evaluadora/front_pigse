@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { z } from "zod"
 
 import { Badge } from "@/components/ui/badge"
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -42,6 +44,8 @@ import { SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { getErrorMessage } from "@/lib/api-client"
 import { optionalImageFile } from "@/lib/image-file"
 import { env } from "@/config/env"
+import { paths } from "@/config/paths"
+import { useLogout, useUser } from "@/lib/auth"
 
 import { useCreate } from "@/features/establishment/employees/api/mutations/use-create"
 import { useCreateWithPerson } from "@/features/establishment/employees/api/mutations/use-create-with-person"
@@ -71,6 +75,7 @@ import {
   type PermissionStatus,
 } from "@/features/establishment/institution/api/types/permission"
 import { passwordRules } from "@/features/auth/api/schema"
+import { validarFormatoPersona } from "@/features/establishment/shared/person-field-rules"
 import {
   PASSWORD_PLACEHOLDER,
   UserDetailsForm,
@@ -161,6 +166,13 @@ const employeePersonSchema = z
     require("identification", person.identification, "Ingresa el número de documento.")
     require("firstName", person.firstName, "Ingresa el primer nombre.")
     require("lastName", person.lastName, "Ingresa el primer apellido.")
+
+    // Formato de cada campo — nombres sin caracteres especiales, documento
+    // de 3 a 15 dígitos, teléfono de hasta 10, correo válido y mayoría de
+    // edad. Vive en un módulo compartido con rector/secretaria (misma regla
+    // que Colombia Evaluadora) para que las dos pantallas no se
+    // desincronicen.
+    validarFormatoPersona(person, ctx)
 
     // Persona SIN `id` todavía: va a `POST /register/pigse/funcionario`, que
     // exige `@NotBlank` en email/password. Persona CON `id` va a PUT
@@ -375,6 +387,20 @@ export function ManageEmployeeDialog({
 }: ManageEmployeeDialogProps) {
   const { notify } = useNotify()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { data: currentUser } = useUser()
+  // El `sub` del JWT (y por lo tanto `AuthUser.email`) ES el correo: si este
+  // guardado edita al usuario autenticado y le cambia el correo, el próximo
+  // `POST /auth/refresh` ya no encuentra ese `sub` (user_not_found) — la
+  // sesión queda viva unos minutos por el token en memoria hasta que algo
+  // dispara un refresh. Se cierra la sesión de forma controlada en vez de
+  // dejar que eso pase en silencio.
+  const logoutMutation = useLogout()
+  const [selfEmailChangedDialogOpen, setSelfEmailChangedDialogOpen] = useState(false)
+  // Correo con el que se cargó el funcionario al abrir el diálogo: `person`
+  // ya lo pisa el formulario apenas se edita, así que sin esto no hay forma
+  // de saber si el correo CAMBIÓ al guardar.
+  const originalEmailRef = useRef<string | undefined>(undefined)
   const isEditMode = Boolean(employeeId)
   const [createdEmployeeId, setCreatedEmployeeId] = useState<number | null>(null)
 
@@ -457,6 +483,7 @@ export function ManageEmployeeDialog({
     }
     const loadedAdditionalInfo = createAdditionalInfoFromEmployee(employee)
 
+    originalEmailRef.current = employee.person.email
     setPerson(loadedPerson)
     setAdditionalInfo(loadedAdditionalInfo)
     setPermissions(employee.permissions)
@@ -598,6 +625,17 @@ export function ManageEmployeeDialog({
     }
     setPersonErrors({})
 
+    // Edita al usuario de la sesión actual y le cambia el correo (sin
+    // importar mayúsculas: el correo es case-insensitive para el login y
+    // para el `sub` del JWT).
+    const selfEmailChanged = Boolean(
+      isEditMode &&
+        currentUser?.email &&
+        originalEmailRef.current &&
+        originalEmailRef.current.toLowerCase() === currentUser.email.toLowerCase() &&
+        (draft.email ?? "").toLowerCase() !== originalEmailRef.current.toLowerCase(),
+    )
+
     if (env.ENABLE_API_MOCKING) {
       const payload: Employee = {
         id: activeEmployeeId ?? undefined,
@@ -642,6 +680,10 @@ export function ManageEmployeeDialog({
       })
       if (result.status === "error") {
         notify(result.message, { variant: "error" })
+        return
+      }
+      if (selfEmailChanged) {
+        setSelfEmailChangedDialogOpen(true)
         return
       }
       notify(SUCCESS_MESSAGES.employee.updated)
@@ -690,13 +732,33 @@ export function ManageEmployeeDialog({
         return
       }
 
+      // El aviso de cierre de sesión REEMPLAZA al mensaje y cierre normales:
+      // el diálogo sigue montado para mostrar el modal bloqueante.
+      if (selfEmailChanged) {
+        setSelfEmailChangedDialogOpen(true)
+        return
+      }
+
       notify(SUCCESS_MESSAGES.employee.updated)
       onOpenChange(false)
     } catch (error) {
-      notify(error instanceof Error ? error.message : "No fue posible guardar el funcionario.", {
+      notify(getErrorMessage(error), {
         variant: "error",
       })
     }
+  }
+
+  /**
+   * "Entendido" del modal de correo propio actualizado — y también lo que
+   * corre si se cierra por otra vía (Escape/backdrop): quedarse logueado con
+   * un token que ya no resuelve en el backend es justo el estado roto que
+   * este aviso previene, así que no hay un "cancelar" real.
+   */
+  async function handleConfirmSelfEmailChanged() {
+    setSelfEmailChangedDialogOpen(false)
+    onOpenChange(false)
+    await logoutMutation.mutateAsync(undefined)
+    navigate({ to: paths.auth.login.path })
   }
 
   function addPermission() {
@@ -840,7 +902,7 @@ export function ManageEmployeeDialog({
       setPermissionsDialogOpen(false)
       notify("Permisos actualizados.")
     } catch (error) {
-      notify(error instanceof Error ? error.message : "No fue posible actualizar los permisos.", {
+      notify(getErrorMessage(error), {
         variant: "error",
       })
     } finally {
@@ -1254,7 +1316,7 @@ export function ManageEmployeeDialog({
                     <TableCell className="font-medium">{permission.order}</TableCell>
                     <TableCell>{permission.campusName}</TableCell>
                     <TableCell>{permission.role.name}</TableCell>
-                    <TableCell className="uppercase">{permission.workSchedule.name}</TableCell>
+                    <TableCell>{permission.workSchedule.name}</TableCell>
                     <TableCell>
                       <Badge {...PERMISSION_STATUS_BADGE[permission.status]}>
                         {permission.status === "ACTIVE" ? "Activo" : "Suspendido"}
@@ -1343,6 +1405,36 @@ export function ManageEmployeeDialog({
             >
               <XIcon data-icon="inline-start" />
               Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bloqueante a propósito: no hay "Cancelar" — ver
+          `handleConfirmSelfEmailChanged`. */}
+      <Dialog
+        open={selfEmailChangedDialogOpen}
+        onOpenChange={(next) => {
+          if (!next) void handleConfirmSelfEmailChanged()
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Correo electrónico actualizado</DialogTitle>
+            <DialogDescription>
+              El correo electrónico se actualizó correctamente. Por seguridad, se cerrará su sesión.
+              Deberá iniciar sesión nuevamente con su nuevo correo electrónico.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="px-6 pb-6 sm:justify-end">
+            <Button
+              variant="fill"
+              color="primary"
+              size="sm"
+              onClick={() => void handleConfirmSelfEmailChanged()}
+              disabled={logoutMutation.isPending}
+            >
+              {logoutMutation.isPending ? "Cerrando sesión..." : "Entendido"}
             </Button>
           </DialogFooter>
         </DialogContent>
