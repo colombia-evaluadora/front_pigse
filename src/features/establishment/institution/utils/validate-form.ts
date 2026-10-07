@@ -4,6 +4,7 @@ import { passwordRules } from "@/features/auth/api/schema"
 import { optionalImageFile } from "@/lib/image-file"
 import type { EstablishmentDetails } from "@/features/establishment/institution/api/types/establishment"
 import type { Person } from "@/features/establishment/employees/api/types/person"
+import { validarFormatoPersona } from "@/features/establishment/shared/person-field-rules"
 
 export interface EstablishmentFormValidationResult {
   /** Etiquetas de los campos que fallaron, en el orden en que se validan. */
@@ -183,16 +184,11 @@ function makePersonSchema(required: boolean) {
       require("firstName", p.firstName, "Ingresa el primer nombre.")
       require("lastName", p.lastName, "Ingresa el primer apellido.")
 
-      // Formato, no obligatoriedad: eso ya lo cubre `require("email", ...)`
-      // más abajo (solo para persona nueva). Acá se valida cualquier correo
-      // no vacío, exista o no la cuenta, nueva o ya cargada.
-      if (!isBlank(p.email) && !z.string().email().safeParse(p.email).success) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["email"],
-          message: "Ingresa un correo electrónico válido.",
-        })
-      }
+      // Formato, no obligatoriedad (esa la cubren los `require`): nombres,
+      // documento de 3 a 15 dígitos, teléfono, correo y mayoría de edad.
+      // Compartido con funcionarios —misma clase de persona, mismo backend—
+      // para que las dos pantallas no se desincronicen.
+      validarFormatoPersona(p, ctx)
 
       /**
        * Persona SIN `id` todavía (nunca tuvo rector/secretaria enlazado, o
