@@ -29,6 +29,7 @@ import {
   documentCategoryDisplayName,
 } from "@/features/document-management/api/types/document"
 import type { DocumentCategory, DocumentType } from "@/features/document-management/api/types/document"
+import { getErrorMessage } from "@/lib/api-client"
 
 interface DocumentCategoriesTableProps {
   type: DocumentType
@@ -40,7 +41,7 @@ interface DocumentCategoriesTableProps {
  * viene de la URL (`/gestion-documental/:tipo`, ver `paths.ts`).
  */
 export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) {
-  const { data: categories = [], isPending, isError, refetch } = useDocumentCategoriesQuery(type)
+  const { data: categories = [], isPending, isError, error, refetch } = useDocumentCategoriesQuery(type)
   const userQuery = useUser()
   const isReadOnly = !canWriteDocuments(userQuery.data)
 
@@ -128,7 +129,7 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
           isError={isError}
           onRetry={refetch}
           emptyMessage="No hay anexos configurados."
-          errorMessage="Ocurrió un error al cargar los anexos."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
       </TableScreenBody>
     </TableScreen>

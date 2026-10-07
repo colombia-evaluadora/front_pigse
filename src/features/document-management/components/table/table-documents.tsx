@@ -22,6 +22,7 @@ import {
   SearchDocuments,
   type DocumentsFilters,
 } from "@/features/document-management/components/search/search-documents"
+import { getErrorMessage } from "@/lib/api-client"
 
 /** Roles de fiscalización (V368): ven el estado documental de TODAS las
  * instituciones, no solo la propia — mismo criterio que ya tienen para
@@ -50,7 +51,7 @@ export function DocumentManagementTable() {
  * `canWriteDocuments` (Rector incluido desde V521).
  */
 function OwnEstablishmentDocumentsTable() {
-  const { data: documents = [], isPending, isError, refetch } = useDocumentsQuery()
+  const { data: documents = [], isPending, isError, error, refetch } = useDocumentsQuery()
 
   const establishmentName = documents.find((d) => d.establishmentName)?.establishmentName
 
@@ -87,7 +88,7 @@ function OwnEstablishmentDocumentsTable() {
           isError={isError}
           onRetry={refetch}
           emptyMessage="No hay documentos institucionales configurados."
-          errorMessage="Ocurrió un error al cargar los documentos institucionales."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
       </TableScreenBody>
     </TableScreen>
@@ -111,7 +112,7 @@ function AllInstitutionsDocumentsTable() {
   const activeFilterCount =
     (filters.search ? 1 : 0) + (filters.type.length ? 1 : 0) + (filters.status.length ? 1 : 0)
 
-  const { data, isPending, isError, refetch } = useAllDocumentsQuery(
+  const { data, isPending, isError, error, refetch } = useAllDocumentsQuery(
     {
       search: filters.search,
       type: filters.type[0],
@@ -170,7 +171,7 @@ function AllInstitutionsDocumentsTable() {
           isError={isError}
           onRetry={refetch}
           emptyMessage="No hay instituciones registradas."
-          errorMessage="Ocurrió un error al cargar los documentos institucionales."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
 
         <Pagination

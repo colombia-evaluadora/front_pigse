@@ -156,7 +156,7 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
           <Tooltip>
             <TooltipTrigger
               render={
-                <span className="block max-w-[16rem] truncate text-sm text-foreground uppercase" />
+                <span className="block max-w-[16rem] truncate text-sm text-foreground" />
               }
             >
               {fullText}
@@ -214,14 +214,14 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
         }
 
         // Un funcionario puede tener permisos en varias jornadas: se listan
-        // separadas por comas y en mayúsculas, igual que la columna "Rol".
+        // separadas por comas, tal como las devuelve el back, igual que "Rol".
         const fullText = formatCatalogNames(workSchedules)
 
         return (
           <Tooltip>
             <TooltipTrigger
               render={
-                <span className="block max-w-[12rem] truncate text-sm text-foreground uppercase" />
+                <span className="block max-w-[12rem] truncate text-sm text-foreground" />
               }
             >
               {fullText}

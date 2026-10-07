@@ -16,6 +16,7 @@ import { useUserActivityQuery } from "@/features/administration/user-activity/ap
 import { useUserActivityFilters } from "@/features/administration/user-activity/hooks/use-user-activity-filters"
 import { columns } from "@/features/administration/user-activity/components/table/columns-user-activity"
 import { SearchUserActivity } from "@/features/administration/user-activity/components/search/search-user-activity"
+import { getErrorMessage } from "@/lib/api-client"
 
 /**
  * "Actividad de usuarios": una fila por (establecimiento, usuario PIGSE
@@ -28,7 +29,7 @@ export function UserActivityDataTable() {
   const { pageIndex, pageSize, goToPage, setPageSize, sorting, setSorting } = useTablePagination()
   const { filters, queryFilters, applyFilters, clearAllFilters, activeFilterCount } =
     useUserActivityFilters()
-  const { data, isPending, isError, refetch } = useUserActivityQuery({
+  const { data, isPending, isError, error, refetch } = useUserActivityQuery({
     filters: queryFilters,
     sorting,
     pageIndex,
@@ -69,7 +70,7 @@ export function UserActivityDataTable() {
           isError={isError}
           onRetry={refetch}
           emptyMessage="Sin resultados."
-          errorMessage="Ocurrió un error al cargar la actividad de usuarios."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
         {data && (
           <Pagination

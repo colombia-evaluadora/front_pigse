@@ -23,6 +23,7 @@ import {
   type ComplianceFilters,
   type ComplianceRow,
 } from "@/features/monitoring/api/types/compliance"
+import { getErrorMessage } from "@/lib/api-client"
 
 /**
  * Tablero "Monitoreo y cumplimiento institucional": KPIs globales de
@@ -58,7 +59,7 @@ function MonitoringComplianceTableContent() {
     (filters.pmi.length ? 1 : 0) +
     (filters.pfi.length ? 1 : 0)
 
-  const { data, isPending, isError, refetch } = useComplianceRowsQuery({
+  const { data, isPending, isError, error, refetch } = useComplianceRowsQuery({
     filters,
     sorting,
     pageIndex,
@@ -118,7 +119,7 @@ function MonitoringComplianceTableContent() {
               ? "Ningún establecimiento coincide con los filtros."
               : "No hay establecimientos educativos registrados."
           }
-          errorMessage="Ocurrió un error al cargar el detalle por establecimiento."
+          errorMessage={error ? getErrorMessage(error) : undefined}
         />
 
         <Pagination

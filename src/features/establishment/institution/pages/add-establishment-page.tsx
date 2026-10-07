@@ -406,7 +406,7 @@ export function AddEstablishmentPage() {
           pkFuncionarioRegistrado: registered.pkFuncionario,
         }
       } catch (error) {
-        notify(error instanceof Error ? error.message : `No fue posible guardar el ${label}.`, {
+        notify(getErrorMessage(error), {
           variant: "error",
         })
         throw new Error(`person_persist_failed:${label}`)
