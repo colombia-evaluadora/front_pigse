@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { z } from "zod"
 
 import { useNotify } from "@/components/notice/notice-context"
+import { getErrorMessage } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -76,20 +78,14 @@ interface Draft {
   planId: string
 }
 
-let draftKey = 0
-function nextKey() {
-  draftKey += 1
-  return draftKey
-}
-
-function emptyDraft(): Draft {
-  return { key: nextKey(), name: "", path: "", visible: true, planId: "" }
+function emptyDraft(key: number): Draft {
+  return { key, name: "", path: "", visible: true, planId: "" }
 }
 
 /** Submenú existente, tal como se carga en la tabla al editar su carpeta. */
-function draftFromMenu(child: MenuNode): Draft {
+function draftFromMenu(child: MenuNode, key: number): Draft {
   return {
-    key: nextKey(),
+    key,
     id: child.id,
     name: child.name,
     path: child.path ?? "",
@@ -135,6 +131,7 @@ function PlanSelect({
       },
     },
   })
+  const planError = createPlan.error ? getErrorMessage(createPlan.error) : null
 
   return (
     <Select value={value} onValueChange={(next) => next && onChange(String(next))}>
@@ -182,6 +179,11 @@ function PlanSelect({
             <ControlPointIcon />
           </Button>
         </div>
+        {planError && (
+          <p role="alert" className="text-destructive px-2 pb-2 text-xs">
+            {planError}
+          </p>
+        )}
       </SelectContent>
     </Select>
   )
@@ -233,6 +235,15 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
   const [visible, setVisible] = useState(true)
   const [planId, setPlanId] = useState("")
   const [drafts, setDrafts] = useState<Draft[]>([])
+  // `key` de React de cada fila de la tabla de submenús (los nuevos no tienen
+  // `id` todavía). Contador por instancia del diálogo — solo tiene que ser
+  // único dentro de `drafts` — en lugar de una variable de módulo. Se pide
+  // FUERA de los updaters de `setDrafts`: StrictMode los invoca dos veces.
+  const draftKeyRef = useRef(0)
+  function nextDraftKey() {
+    draftKeyRef.current += 1
+    return draftKeyRef.current
+  }
   // Mensaje por campo del menú raíz, indexado por su nombre en el esquema.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -250,14 +261,23 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
     // lo que se está editando. En alta la tabla arranca vacía.
     setDrafts(
       menu != null && menu.idParent == null && "children" in menu
-        ? menu.children.map(draftFromMenu)
+        ? menu.children.map((child) => draftFromMenu(child, nextDraftKey()))
         : [],
     )
     setFieldErrors({})
+    setSaveError(null)
   }, [open, menu])
 
+  const [saveError, setSaveError] = useState<string | null>(null)
   const saveMenu = useSaveMenu()
-  const deleteMenu = useDeleteMenu()
+  const deleteMenu = useDeleteMenu({
+    mutationConfig: {
+      onSuccess: (result) => {
+        if (result.status === "error") setSaveError(result.message)
+      },
+      onError: (error) => setSaveError(getErrorMessage(error)),
+    },
+  })
 
   /** Los submenús que la carpeta ya tenía al abrir el diálogo. */
   const existingChildren = menu != null && "children" in menu ? menu.children : []
@@ -330,6 +350,7 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
     }
 
     setFieldErrors({})
+    setSaveError(null)
 
     try {
       if (isEditing) {
@@ -389,8 +410,9 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
       }
       onOpenChange(false)
       notify(isEditing ? "El menú se actualizó correctamente." : "El menú se creó correctamente.")
-    } catch {
-      // El interceptor de `api` ya muestra el error del backend.
+    } catch (error) {
+      // El NoticeProvider apaga el toast global: el error va al banner del diálogo.
+      setSaveError(getErrorMessage(error))
     }
   }
 
@@ -399,22 +421,52 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
       {/* Mientras la única pregunta es el menú padre, el diálogo se queda del
           ancho de esa pregunta; recién al contestarla aparecen los submenús,
           que sí necesitan las cinco columnas. */}
-      <DialogContent className={hasParentChoice ? "sm:max-w-2xl" : "sm:max-w-sm"}>
-        <DialogHeader>
+      <DialogContent
+        className={cn(
+          "flex max-h-[85vh] flex-col overflow-hidden p-0",
+          hasParentChoice ? "sm:max-w-2xl" : "sm:max-w-sm",
+        )}
+        // La X solo se oculta cuando el footer con "Cancelar" ya está
+        // visible (`hasParentChoice`, ver el `DialogFooter` condicional más
+        // abajo) -- sin menú padre elegido todavía no hay footer, y la X
+        // sigue siendo la única forma de cerrar.
+        showCloseButton={!hasParentChoice}
+      >
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>{isEditing ? "Editar menú" : "Agregar menú"}</DialogTitle>
+          {saveError && (
+            <p role="alert" className="text-destructive text-sm">
+              {saveError}
+            </p>
+          )}
         </DialogHeader>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        {/* Único bloque con scroll: header y footer quedan fijos afuera, con
+            su propio padding -- el `DialogContent` ya no tiene padding
+            propio (`p-0`), así que el scroll queda al borde REAL del
+            diálogo (no flotando adentro del padding) y es este `div` el que
+            aporta el `px-6` para que el contenido no toque el scrollbar.
+            "Submenús" deja agregar filas sin tope (`setDrafts`), y sin el
+            `max-h` de arriba el diálogo crecía sin límite y se llevaba el
+            título/botones con él. */}
+        <div
+          className={cn(
+            "scrollbar-slim min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 flex min-w-0 flex-col gap-4",
+            // Sin `hasParentChoice` el `DialogFooter` de abajo no se
+            // renderiza (ver más abajo) -- este `div` queda como el ÚLTIMO
+            // elemento del diálogo y necesita su propio `pb-6`, o el campo
+            // "Menú padre" (y su popover "Sin resultados") quedan pegados
+            // al borde real de abajo, sin respiro.
+            !hasParentChoice && "pb-6",
+          )}
+        >
           {/* Mismo tratamiento que el diálogo de escalas de valoración: sobre la
               grilla de dos columnas, el campo ocupa el ancho entero mientras es
               la única pregunta y baja a media columna cuando el diálogo crece. */}
           <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
             <Field variant="outlined" className={hasParentChoice ? "" : "sm:col-span-2"}>
               <FieldLabel htmlFor="menu-parent">Menú padre</FieldLabel>
-              <ComboboxField
-                value={parent}
-                onValueChange={(value) => value && setParent(String(value))}
-              >
+              <ComboboxField value={parent} onValueChange={(value) => value && setParent(String(value))}>
                 <ComboboxFieldTrigger id="menu-parent">
                   <ComboboxFieldValue>
                     {(value) =>
@@ -472,10 +524,7 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
               </Field>
               <Field variant="outlined" data-invalid={fieldErrors["icon"] ? "true" : undefined}>
                 <FieldLabel htmlFor="menu-icon">Icono*</FieldLabel>
-                <ComboboxField
-                  value={icon}
-                  onValueChange={(value) => value && setIcon(String(value))}
-                >
+                <ComboboxField value={icon} onValueChange={(value) => value && setIcon(String(value))}>
                   <ComboboxFieldTrigger id="menu-icon" aria-invalid={Boolean(fieldErrors["icon"])}>
                     {/* Lo elegido se muestra con su ícono, igual que en la
                         lista: el nombre solo no dice cuál se eligió, y el ícono
@@ -517,9 +566,7 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
                   onValueChange={(value) => value && setVisible(value === "si")}
                 >
                   <ComboboxFieldTrigger id="menu-visible">
-                    <ComboboxFieldValue>
-                      {(value) => (value === "no" ? "No" : "Si")}
-                    </ComboboxFieldValue>
+                    <ComboboxFieldValue>{(value) => (value === "no" ? "No" : "Si")}</ComboboxFieldValue>
                   </ComboboxFieldTrigger>
                   <ComboboxFieldContent>
                     <ComboboxFieldItem value="si">Si</ComboboxFieldItem>
@@ -566,9 +613,7 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
                   onValueChange={(value) => value && setVisible(value === "si")}
                 >
                   <ComboboxFieldTrigger id="menu-edit-visible">
-                    <ComboboxFieldValue>
-                      {(value) => (value === "no" ? "No" : "Si")}
-                    </ComboboxFieldValue>
+                    <ComboboxFieldValue>{(value) => (value === "no" ? "No" : "Si")}</ComboboxFieldValue>
                   </ComboboxFieldTrigger>
                   <ComboboxFieldContent>
                     <ComboboxFieldItem value="si">Si</ComboboxFieldItem>
@@ -592,7 +637,10 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
                 <Button
                   type="button"
                   size="icon-sm"
-                  onClick={() => setDrafts((prev) => [...prev, emptyDraft()])}
+                  onClick={() => {
+                    const draft = emptyDraft(nextDraftKey())
+                    setDrafts((prev) => [...prev, draft])
+                  }}
                 >
                   <span className="sr-only">Agregar submenú</span>
                   <ControlPointIcon />
@@ -645,9 +693,7 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
                           }
                         >
                           <ComboboxFieldTrigger variant="outlined" aria-label="Visible">
-                            <ComboboxFieldValue>
-                              {(value) => (value === "no" ? "No" : "Si")}
-                            </ComboboxFieldValue>
+                            <ComboboxFieldValue>{(value) => (value === "no" ? "No" : "Si")}</ComboboxFieldValue>
                           </ComboboxFieldTrigger>
                           <ComboboxFieldContent>
                             <ComboboxFieldItem value="si">Si</ComboboxFieldItem>
@@ -685,7 +731,7 @@ export function DialogSaveMenu({ open, onOpenChange, roots, menu }: DialogSaveMe
             allá de la X del encabezado, así que el pie recién aparece con la
             primera respuesta. */}
         {hasParentChoice && (
-          <DialogFooter>
+          <DialogFooter className="shrink-0 px-6 pb-6">
             <Button
               size="sm"
               type="button"

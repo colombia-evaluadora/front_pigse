@@ -2,6 +2,7 @@ import type { ReactElement } from "react"
 
 import { ConfirmRemoveDialog } from "@/components/confirm-remove-button"
 import { useNotify } from "@/components/notice/notice-context"
+import { getErrorMessage } from "@/lib/api-client"
 
 import { useDeleteMenu } from "@/features/administration/roles-menus/api/mutations/delete-menu"
 import type { MenuNode } from "@/features/administration/roles-menus/api/types/role-menu"
@@ -43,7 +44,16 @@ export function DialogDeleteMenu({ menu, childrenCount, trigger }: DialogDeleteM
           roles. Esta acción no se puede deshacer.
         </>
       }
-      onConfirm={() => deleteMenu.mutateAsync({ id: menu.id })}
+      onConfirm={async () => {
+        // El NoticeProvider de la página apaga el toast global de axios: sin
+        // este catch el error se perdía en silencio (y la promesa rechazada
+        // quedaba sin manejar). Se cierra el diálogo y el aviso va a la página.
+        try {
+          await deleteMenu.mutateAsync({ id: menu.id })
+        } catch (error) {
+          notify(getErrorMessage(error), { variant: "error" })
+        }
+      }}
       trigger={trigger}
     />
   )
