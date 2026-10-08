@@ -8,14 +8,14 @@ import type { UpdateRoleMenusResult } from "@/features/administration/roles-menu
 
 interface UpdateRoleMenusInput {
   roleId: number
-  menuIds: number[]
+  menus: { id: number; soloLectura: boolean }[]
 }
 
 function updateRoleMenus({
   roleId,
-  menuIds,
+  menus,
 }: UpdateRoleMenusInput): Promise<UpdateRoleMenusResult> {
-  return pigse.putRow<UpdateRoleMenusResult>(`/roles/${roleId}/menus`, { menuIds })
+  return pigse.putRow<UpdateRoleMenusResult>(`/roles/${roleId}/menus`, { menus })
 }
 
 interface UseUpdateRoleMenusOptions {
@@ -32,6 +32,8 @@ export function useUpdateRoleMenus({ mutationConfig }: UseUpdateRoleMenusOptions
       // El menú lateral del usuario sale del mismo catálogo: si cambian los
       // permisos de su rol, hay que volver a pedirlo.
       queryClient.invalidateQueries({ queryKey: ["navigation", "menu"] })
+      // "Solo lectura" cambia puedeCrear/Editar/Eliminar de `useMenuPermission`.
+      queryClient.invalidateQueries({ queryKey: ["menu-permission"] })
       mutationConfig?.onSuccess?.(data, variables, ...rest)
     },
   })
