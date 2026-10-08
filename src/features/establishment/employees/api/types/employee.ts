@@ -31,6 +31,9 @@ export interface EmployeeListItem {
   id: number
   documentNumber: string
   name: string
+  /** Correo de la cuenta (`correo_electronico`); lo usan las acciones de fila
+   * de restablecer contraseña y reenviar activación. Puede venir vacío. */
+  email: string
   establishmentName: string
   /**
    * Roles agregados a partir de los permisos del funcionario

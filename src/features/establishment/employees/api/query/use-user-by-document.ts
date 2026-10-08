@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { env } from "@/config/env"
 import { api } from "@/lib/api-client"
 import { unwrapRows } from "@/lib/response-envelope"
@@ -117,7 +118,7 @@ export async function findPersonByDocument(
     birthDate: row.fecha_nacimiento ?? "",
     gender: toGenderCatalogItem(row.fk_tlv_genero, row.genero_nombre),
     phone: row.telefono ?? "",
-    email: row.correo_electronico ?? "",
+    email: toEmailInput(row.correo_electronico ?? ""),
     photoArchivoId: row.fk_tarchivo_foto,
     accountExists: true,
     ...(row.pk_tfuncionario_activo ? { id: row.pk_tfuncionario_activo } : {}),

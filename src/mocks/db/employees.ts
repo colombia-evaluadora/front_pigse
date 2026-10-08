@@ -108,6 +108,7 @@ export function createEmployeeRow(employee: Employee & { id: number }): Employee
     id: employee.id,
     documentNumber: employee.person.identification,
     name,
+    email: employee.person.email ?? "",
     establishmentName: faker.company.name(),
     roles,
     campuses: Array.from(campusNames),

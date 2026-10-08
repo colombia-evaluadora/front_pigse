@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -51,6 +52,10 @@ import { useCreate } from "@/features/establishment/employees/api/mutations/use-
 import { useCreateWithPerson } from "@/features/establishment/employees/api/mutations/use-create-with-person"
 import { update as updateFuncionario } from "@/features/establishment/employees/api/mutations/update"
 import { useUpdate } from "@/features/establishment/employees/api/mutations/use-update"
+import {
+  correoCambio,
+  reactivarPorCambioDeCorreo,
+} from "@/features/establishment/employees/api/mutations/use-reactivar-por-cambio-de-correo"
 import { registerFuncionario } from "@/features/establishment/employees/api/mutations/use-register-funcionario"
 import {
   toCrearItem,
@@ -632,8 +637,9 @@ export function ManageEmployeeDialog({
       isEditMode &&
         currentUser?.email &&
         originalEmailRef.current &&
-        originalEmailRef.current.toLowerCase() === currentUser.email.toLowerCase() &&
-        (draft.email ?? "").toLowerCase() !== originalEmailRef.current.toLowerCase(),
+        toEmailInput(originalEmailRef.current).toLowerCase() ===
+          toEmailInput(currentUser.email).toLowerCase() &&
+        correoCambio(originalEmailRef.current, draft.email),
     )
 
     if (env.ENABLE_API_MOCKING) {
@@ -724,6 +730,32 @@ export function ManageEmployeeDialog({
       // (`["employees", id]`) seguían mostrando los datos viejos tras editar.
       void queryClient.invalidateQueries({ queryKey: ["employees"] })
 
+      // 3) Correo cambiado (solo edición): la cuenta SSO vuelve a "pendiente
+      //    de activación" y se envía el correo de activación al correo nuevo
+      //    (auth-center, enlace de PIGSE). Va DESPUÉS del PUT porque el
+      //    backend valida que el cambio ya esté aplicado. Si falla, el
+      //    guardado ya quedó hecho: se avisa y se cierra igual.
+      let activacionMsg: string | null = null
+      const correoAnterior = originalEmailRef.current ?? ""
+      if (activeEmployeeId && correoCambio(correoAnterior, draft.email)) {
+        try {
+          await reactivarPorCambioDeCorreo({
+            correoAnterior: toEmailInput(correoAnterior),
+            correoNuevo: toEmailInput(draft.email ?? ""),
+          })
+          activacionMsg = `Se envió el correo de activación a ${toEmailInput(draft.email ?? "")}.`
+        } catch (error) {
+          notify(
+            `${SUCCESS_MESSAGES.employee.updated} No fue posible enviar el correo de activación: ${
+              getErrorMessage(error) || "error desconocido"
+            }`,
+            { variant: "error" },
+          )
+          onOpenChange(false)
+          return
+        }
+      }
+
       setCreatedEmployeeId(funcionarioId)
       cleanSnapshotRef.current = buildDraftSnapshot(draft, additionalInfo, permissions)
 
@@ -743,7 +775,11 @@ export function ManageEmployeeDialog({
         return
       }
 
-      notify(SUCCESS_MESSAGES.employee.updated)
+      notify(
+        activacionMsg
+          ? `${SUCCESS_MESSAGES.employee.updated} ${activacionMsg}`
+          : SUCCESS_MESSAGES.employee.updated,
+      )
       onOpenChange(false)
     } catch (error) {
       notify(getErrorMessage(error), {
@@ -1427,7 +1463,8 @@ export function ManageEmployeeDialog({
             <DialogTitle>Correo electrónico actualizado</DialogTitle>
             <DialogDescription>
               El correo electrónico se actualizó correctamente. Por seguridad, se cerrará su sesión.
-              Deberá iniciar sesión nuevamente con su nuevo correo electrónico.
+              Le llegará un correo de activación a su nuevo correo electrónico: active la cuenta
+              desde ese enlace y defina su contraseña para volver a iniciar sesión.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="px-6 pb-6 sm:justify-end">

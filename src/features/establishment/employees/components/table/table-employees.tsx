@@ -22,6 +22,7 @@ import type { EmployeeListItem } from "@/features/establishment/employees/api/ty
 import { useEmployeesQuery } from "@/features/establishment/employees/api/query/use-employees"
 import { useEmployeeRolesQuery } from "@/features/establishment/employees/api/query/use-employee-roles"
 import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
+import { useEstadoCuentaQuery } from "@/features/establishment/employees/api/query/use-estado-cuenta"
 import { EMPLOYEE_STATUS_OPTIONS } from "@/features/establishment/employees/api/ui-mappings"
 import { CATALOGS } from "@/lib/catalogs"
 import type { CatalogItem } from "@/types/catalog"
@@ -67,7 +68,18 @@ export function EmployeesDataTable({ onEditEmployee, title, action }: EmployeesD
     pageSize,
   })
 
-  const columns = useMemo(() => createColumns({ onEdit: onEditEmployee }), [onEditEmployee])
+  // Estado de la cuenta SSO de los correos de la página actual: habilita o no
+  // "Reenviar correo de activación". Si falla, la tabla sigue andando.
+  const correos = Array.from(
+    new Set((data?.rows ?? []).map((row) => row.email?.trim().toLowerCase()).filter(Boolean)),
+  ).sort()
+  const estadoCuenta = useEstadoCuentaQuery(correos)
+  const estadosCuenta = estadoCuenta.isError ? ("error" as const) : estadoCuenta.data
+
+  const columns = useMemo(
+    () => createColumns({ onEdit: onEditEmployee, estadosCuenta }),
+    [onEditEmployee, estadosCuenta],
+  )
 
   const { table, selectedIds, hasSelection, resetSelection } = useDataTable({
     columns,

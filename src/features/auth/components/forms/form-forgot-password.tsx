@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useForm } from "@tanstack/react-form"
 
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -47,7 +48,7 @@ export function ForgotPasswordForm({ id, onSubmit }: ForgotPasswordFormProps) {
                     placeholder="usuario@institucion.edu.co"
                     value={field.state.value}
                     onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
+                    onChange={(e) => field.handleChange(toEmailInput(e.target.value))}
                     aria-invalid={isInvalid}
                   />
                 </InputGroup>
