@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query"
 
 import { downloadReport } from "@/lib/report-client"
-import { toCampusesReportFilters } from "@/features/establishment/campuses/api/query/use-campuses"
+import { toCampusesQueryFilters } from "@/features/establishment/campuses/api/query/use-campuses"
 import type { MutationConfig } from "@/lib/react-query"
 import type { CampusesQueryRequest } from "@/features/establishment/campuses/api/types/campus"
 import type { ExportFormat, ExportResult } from "@/features/establishment/institution/api/types/export"
@@ -17,13 +17,13 @@ function exportCampuses(input: ExportCampusesInput): Promise<ExportResult> {
   // llegan NULL y la funcion los ignora, o sea que sin filtros sale todo.
   // `downloadReport` dispara la descarga y devuelve el {status, message}
   // que este dialogo ya sabia consumir.
-  // Los filtros normalizados, pero solo los que la fila de reporte declara:
-  // ver `toCampusesReportFilters`. Sin esta conversión los `<Select>` mandan
-  // los ids como texto y el query-service rechaza el bind BIGINT[] con 400:
-  // la tabla andaba y el reporte fallaba sobre exactamente los mismos filtros.
-  return downloadReport("sedes", {
+  // Los mismos filtros normalizados que el listado: la fila `.../reporte` de
+  // pigse (V549 de sso) declara los mismos binds que `.../query`. La clave
+  // `pigse-*` es la que apunta a query-service-pigse; las sin prefijo son las
+  // de eval-col, donde los roles PIGSE reciben 403.
+  return downloadReport("pigse-sedes", {
     format: input.format,
-    filters: toCampusesReportFilters(input.filters),
+    filters: toCampusesQueryFilters(input.filters),
   })
 }
 

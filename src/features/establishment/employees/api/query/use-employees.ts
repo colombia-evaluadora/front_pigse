@@ -59,23 +59,6 @@ export function toEmployeesQueryFilters(filters: EmployeesQueryRequest["filters"
   }
 }
 
-/**
- * Los filtros que acepta el REPORTE de funcionarios.
- *
- * Deliberadamente más angosto que el del listado: V386 agregó los binds nuevos
- * a la fila `/funcionarios/query` de `public.query`, pero la fila de reporte
- * del `reporting-service` quedó con su juego de tipos viejo. Mandarle
- * `rol`/`jornada`/`estado` la haría fallar con el 400 de "placeholders sin
- * tipo declarado" — o sea, la tabla andando y la exportación rota sobre
- * exactamente los mismos filtros.
- */
-export function toEmployeesReportFilters(filters: EmployeesQueryRequest["filters"]) {
-  return {
-    search: filters.search ?? "",
-    establecimientos: filters.establecimientos ?? [],
-  }
-}
-
 interface UseEmployeesQueryParams {
   filters: EmployeesQueryRequest["filters"]
   sorting: EmployeesQueryRequest["sorting"]

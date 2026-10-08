@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query"
 
 import { downloadReport } from "@/lib/report-client"
-import { toEmployeesReportFilters } from "@/features/establishment/employees/api/query/use-employees"
+import { toEmployeesQueryFilters } from "@/features/establishment/employees/api/query/use-employees"
 import type { MutationConfig } from "@/lib/react-query"
 import type { EmployeesQueryRequest } from "@/features/establishment/employees/api/types/employee"
 import type {
@@ -20,13 +20,13 @@ function exportEmployees(input: ExportEmployeesInput): Promise<ExportResult> {
   // llegan NULL y la funcion los ignora, o sea que sin filtros sale todo.
   // `downloadReport` dispara la descarga y devuelve el {status, message}
   // que este dialogo ya sabia consumir.
-  // Los filtros normalizados, pero solo los que la fila de reporte declara:
-  // ver `toEmployeesReportFilters`. Sin esta conversión los `<Select>` mandan
-  // los ids como texto y el query-service rechaza el bind BIGINT[] con 400:
-  // la tabla andaba y el reporte fallaba sobre exactamente los mismos filtros.
-  return downloadReport("funcionarios", {
+  // Los mismos filtros normalizados que el listado: la fila `.../reporte` de
+  // pigse (V549 de sso) declara los mismos binds que `.../query`. La clave
+  // `pigse-*` es la que apunta a query-service-pigse; las sin prefijo son las
+  // de eval-col, donde los roles PIGSE reciben 403.
+  return downloadReport("pigse-funcionarios", {
     format: input.format,
-    filters: toEmployeesReportFilters(input.filters),
+    filters: toEmployeesQueryFilters(input.filters),
   })
 }
 
