@@ -26,3 +26,18 @@ export function toNitInput(value: string): string {
   const digits = toDigitsOnly(value, 10)
   return digits.length <= 1 ? digits : `${digits.slice(0, -1)}-${digits.slice(-1)}`
 }
+
+/**
+ * Limpia un correo electrónico: quita caracteres invisibles y espacios en
+ * los extremos. Al pegar un correo desde Outlook, Word, WhatsApp o una
+ * página web suelen colarse caracteres de ancho cero (U+200B-U+200D, U+2060
+ * WORD JOINER), el BOM (U+FEFF) o espacios no separables (U+00A0) que
+ * `.trim()` no elimina. El correo "se ve" igual pero no coincide con el
+ * guardado en la base, lo que rompe la reactivación por cambio de correo y
+ * el login. Se usa en el `onChange` de los inputs de correo, al armar
+ * payloads y al comparar correo anterior vs nuevo (para limpiar también
+ * valores sucios que ya estén en la base).
+ */
+export function toEmailInput(value: string): string {
+  return (value ?? "").replace(/[​-‍⁠﻿ ]/g, "").trim()
+}

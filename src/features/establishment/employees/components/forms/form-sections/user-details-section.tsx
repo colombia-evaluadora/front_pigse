@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useEffect, useRef, useState } from "react"
 import { format } from "date-fns"
 
@@ -472,7 +473,7 @@ export function UserDetailsForm({
             placeholder="Agregar"
             value={person.email}
             aria-invalid={isInvalid(`${fieldPrefix}.email`)}
-            onChange={(event) => emitChange({ email: event.target.value })}
+            onChange={(event) => emitChange({ email: toEmailInput(event.target.value) })}
           />
           <FieldError>{errorFor(`${fieldPrefix}.email`)}</FieldError>
         </Field>
