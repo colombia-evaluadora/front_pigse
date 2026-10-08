@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import * as z from "zod"
 
@@ -24,7 +25,7 @@ async function getUser(): Promise<AuthUser | null> {
 const logout = (): Promise<void> => api.post("/auth/logout")
 
 export const loginInputSchema = z.object({
-  email: z.email("Email inválido"),
+  email: z.string().transform(toEmailInput).pipe(z.email("Email inválido")),
   password: z.string().min(1, "Requerido"),
 })
 export type LoginInput = z.infer<typeof loginInputSchema>

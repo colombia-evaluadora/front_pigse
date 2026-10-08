@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useQueryClient } from "@tanstack/react-query"
 import { Link, useLocation, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type FormEvent } from "react"
@@ -407,11 +408,11 @@ export function AddEstablishmentPage() {
           if (correoCambio(correoAnterior, person.email)) {
             try {
               await reactivarPorCambioDeCorreo({
-                correoAnterior: (correoAnterior ?? "").trim(),
-                correoNuevo: person.email.trim(),
+                correoAnterior: toEmailInput(correoAnterior ?? ""),
+                correoNuevo: toEmailInput(person.email),
               })
               activationNoticesRef.current.push(
-                `Se envió el correo de activación a ${person.email.trim()}.`,
+                `Se envió el correo de activación a ${toEmailInput(person.email)}.`,
               )
             } catch (error) {
               activationNoticesRef.current.push(

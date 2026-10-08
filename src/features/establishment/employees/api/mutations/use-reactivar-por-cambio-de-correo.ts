@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useMutation } from "@tanstack/react-query"
 
 import { env } from "@/config/env"
@@ -23,7 +24,10 @@ export interface CambioCorreoInput {
  */
 export async function reactivarPorCambioDeCorreo(input: CambioCorreoInput): Promise<void> {
   if (env.ENABLE_API_MOCKING) return
-  await api.post("/auth/register/pigse/funcionario/reactivar-por-cambio-de-correo", input)
+  await api.post("/auth/register/pigse/funcionario/reactivar-por-cambio-de-correo", {
+    correoAnterior: toEmailInput(input.correoAnterior),
+    correoNuevo: toEmailInput(input.correoNuevo),
+  })
 }
 
 export function useReactivarPorCambioDeCorreo({
@@ -32,9 +36,12 @@ export function useReactivarPorCambioDeCorreo({
   return useMutation({ mutationFn: reactivarPorCambioDeCorreo, ...mutationConfig })
 }
 
-/** true si el correo cambió de verdad (sin distinguir mayúsculas ni espacios). */
+/**
+ * true si el correo cambió de verdad (sin distinguir mayúsculas, espacios ni
+ * caracteres invisibles: ver `toEmailInput`).
+ */
 export function correoCambio(anterior: string | null | undefined, nuevo: string | null | undefined) {
-  const a = (anterior ?? "").trim().toLowerCase()
-  const n = (nuevo ?? "").trim().toLowerCase()
+  const a = toEmailInput(anterior ?? "").toLowerCase()
+  const n = toEmailInput(nuevo ?? "").toLowerCase()
   return a !== "" && n !== "" && a !== n
 }

@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { z } from "zod"
 
 /**
@@ -80,7 +81,7 @@ export function validarFormatoPersona(
   revisar("secondLastName", persona.secondLastName, NOMBRE_PERSONA, MENSAJES.nombre)
   revisar("identification", persona.identification, DOCUMENTO, MENSAJES.documento)
   revisar("phone", persona.phone, TELEFONO, MENSAJES.telefono)
-  revisar("email", persona.email, CORREO, MENSAJES.correo)
+  revisar("email", persona.email == null ? persona.email : toEmailInput(persona.email), CORREO, MENSAJES.correo)
 
   if (!vacio(persona.birthDate)) {
     const nacimiento = new Date(persona.birthDate as string)
