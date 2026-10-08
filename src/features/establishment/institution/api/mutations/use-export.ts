@@ -24,7 +24,7 @@ function exportEstablishments(input: ExportEstablishmentsInput): Promise<ExportR
   // conversión los `<Select>` mandan los ids como texto y el query-service
   // rechaza el bind BIGINT[] con 400: la tabla andaba y el reporte fallaba
   // sobre exactamente los mismos filtros.
-  return downloadReport("establecimientos", {
+  return downloadReport("pigse-establecimientos", {
     format: input.format,
     filters: toEstablishmentsQueryFilters(input.filters),
   })
