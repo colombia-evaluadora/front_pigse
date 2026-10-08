@@ -2,17 +2,23 @@ import { useQuery } from "@tanstack/react-query"
 
 import { pigse } from "@/lib/pigse-client"
 
+export interface RoleMenuAssignment {
+  id: number
+  soloLectura: boolean
+}
+
 /**
- * Ids de los menús que tiene asignados el rol, en el orden guardado para ese
- * rol (que no es el `menuOrder` del catálogo).
- *
- * El backend responde `{rows:[{id}, ...]}`, no una lista de números: una fila
- * de una sola columna no colapsa a escalar. La pantalla trabaja con ids, así
- * que la lista se aplana acá.
+ * Menús asignados al rol con su marca "Solo lectura" (`role_route.puede_*`:
+ * solo lectura = puede ver pero no crear/editar/eliminar). Se aceptan también
+ * filas de un solo número por compatibilidad con la respuesta vieja.
  */
-async function fetchRoleMenus(roleId: number): Promise<number[]> {
-  const rows = await pigse.getRows<{ id: number } | number>(`/roles/${roleId}/menus`)
-  return rows.map((row) => (typeof row === "number" ? row : row.id))
+async function fetchRoleMenus(roleId: number): Promise<RoleMenuAssignment[]> {
+  const rows = await pigse.getRows<{ id: number; soloLectura?: boolean } | number>(
+    `/roles/${roleId}/menus`,
+  )
+  return rows.map((row) =>
+    typeof row === "number" ? { id: row, soloLectura: false } : { id: row.id, soloLectura: row.soloLectura ?? false },
+  )
 }
 
 export const roleMenusQueryKey = (roleId: number | null) => ["role-menus", roleId]
