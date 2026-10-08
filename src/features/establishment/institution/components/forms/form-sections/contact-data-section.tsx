@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { FormSectionHeading } from "@/components/form-section-heading"
@@ -40,7 +41,7 @@ export function ContactDataFormSection({
             maxLength={130}
             value={value.email}
             aria-invalid={isInvalid("contact.email")}
-            onChange={(event) => onChange({ ...value, email: event.target.value })}
+            onChange={(event) => onChange({ ...value, email: toEmailInput(event.target.value) })}
           />
         </Field>
 

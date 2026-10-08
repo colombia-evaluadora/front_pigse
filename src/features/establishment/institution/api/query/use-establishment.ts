@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useQuery } from "@tanstack/react-query"
 
 import { api } from "@/lib/api-client"
@@ -111,7 +112,7 @@ function toEstablishmentDetails(
       address: row.direccion ?? "",
     },
     contact: {
-      email: row.correo_electronico ?? "",
+      email: toEmailInput(row.correo_electronico ?? ""),
       website: row.pagina_web ?? "",
       phone: row.telefono ?? "",
       fax: row.fax ?? "",

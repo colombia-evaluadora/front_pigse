@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import * as z from "zod"
 
 import { loginInputSchema } from "@/lib/auth"
@@ -24,7 +25,7 @@ export const loginSearchSchema = z.object({
 export type LoginSearch = z.infer<typeof loginSearchSchema>
 
 export const forgotPasswordFormSchema = z.object({
-  email: z.email("Email inválido"),
+  email: z.string().transform(toEmailInput).pipe(z.email("Email inválido")),
 })
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordFormSchema>
 

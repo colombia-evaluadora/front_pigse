@@ -1,3 +1,4 @@
+import { toEmailInput } from "@/lib/text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -636,8 +637,9 @@ export function ManageEmployeeDialog({
       isEditMode &&
         currentUser?.email &&
         originalEmailRef.current &&
-        originalEmailRef.current.toLowerCase() === currentUser.email.toLowerCase() &&
-        (draft.email ?? "").toLowerCase() !== originalEmailRef.current.toLowerCase(),
+        toEmailInput(originalEmailRef.current).toLowerCase() ===
+          toEmailInput(currentUser.email).toLowerCase() &&
+        correoCambio(originalEmailRef.current, draft.email),
     )
 
     if (env.ENABLE_API_MOCKING) {
@@ -738,10 +740,10 @@ export function ManageEmployeeDialog({
       if (activeEmployeeId && correoCambio(correoAnterior, draft.email)) {
         try {
           await reactivarPorCambioDeCorreo({
-            correoAnterior: correoAnterior.trim(),
-            correoNuevo: (draft.email ?? "").trim(),
+            correoAnterior: toEmailInput(correoAnterior),
+            correoNuevo: toEmailInput(draft.email ?? ""),
           })
-          activacionMsg = `Se envió el correo de activación a ${(draft.email ?? "").trim()}.`
+          activacionMsg = `Se envió el correo de activación a ${toEmailInput(draft.email ?? "")}.`
         } catch (error) {
           notify(
             `${SUCCESS_MESSAGES.employee.updated} No fue posible enviar el correo de activación: ${
