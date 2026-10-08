@@ -719,6 +719,10 @@ export function ManageEmployeeDialog({
         ...createEmptyEmployeeShell(),
         ...additionalInfo,
       })
+      // `updateFuncionario` es la fn cruda, no el hook `useUpdate`: sin esta
+      // invalidación la tabla (`["employees", params]`) y el detalle
+      // (`["employees", id]`) seguían mostrando los datos viejos tras editar.
+      void queryClient.invalidateQueries({ queryKey: ["employees"] })
 
       setCreatedEmployeeId(funcionarioId)
       cleanSnapshotRef.current = buildDraftSnapshot(draft, additionalInfo, permissions)

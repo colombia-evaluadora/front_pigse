@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query"
 import { Link, useLocation, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 
@@ -251,6 +252,7 @@ export function AddEstablishmentPage() {
     },
   })
 
+  const queryClient = useQueryClient()
   const updateMutation = useUpdate({
     mutationConfig: {
       onSuccess: (result) => {
@@ -382,6 +384,9 @@ export function AddEstablishmentPage() {
             },
             foto,
           )
+          // fn cruda (no `useUpdate`): el listado/detalle de funcionarios
+          // muestran a esta persona y quedarían viejos sin invalidar.
+          void queryClient.invalidateQueries({ queryKey: ["employees"] })
           notify(`${label} actualizado.`)
           return { person, pkFuncionarioRegistrado: null }
         }
