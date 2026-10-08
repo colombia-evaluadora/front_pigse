@@ -37,9 +37,9 @@ reportApi.interceptors.request.use(authRequestInterceptor)
  * fila `…/reporte` en `public.query`.
  */
 export type ReportKey =
-  | "funcionarios"
-  | "establecimientos"
-  | "sedes"
+  | "pigse-funcionarios"
+  | "pigse-establecimientos"
+  | "pigse-sedes"
   | "periodos-academicos"
   | "periodos-evaluacion"
 

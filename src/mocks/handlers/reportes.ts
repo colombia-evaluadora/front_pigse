@@ -24,9 +24,9 @@ const PDF_MINIMO = [
 ].join("\n")
 
 const NOMBRE_POR_CLAVE: Record<string, string> = {
-  funcionarios: "funcionarios",
-  establecimientos: "establecimientos",
-  sedes: "sedes",
+  "pigse-funcionarios": "funcionarios",
+  "pigse-establecimientos": "establecimientos",
+  "pigse-sedes": "sedes",
 }
 
 function fecha() {

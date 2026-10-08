@@ -36,21 +36,6 @@ export function toCampusesQueryFilters(filters: CampusesQueryRequest["filters"])
   }
 }
 
-/**
- * Los filtros que acepta el REPORTE de sedes.
- *
- * Más angosto que el del listado por la misma razón que en funcionarios: V386
- * agregó `BODY.FILTERS.ZONA` a la fila `/sedes/query`, pero la fila de reporte
- * del `reporting-service` quedó con su juego de tipos viejo y rechazaría la
- * clave nueva con 400.
- */
-export function toCampusesReportFilters(filters: CampusesQueryRequest["filters"]) {
-  return {
-    search: filters.search ?? "",
-    establecimiento: filters.establishmentId ?? undefined,
-  }
-}
-
 interface UseCampusesQueryParams {
   filters: CampusesQueryRequest["filters"]
   sorting: CampusesQueryRequest["sorting"]
