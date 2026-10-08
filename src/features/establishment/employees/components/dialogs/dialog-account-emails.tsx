@@ -127,11 +127,33 @@ function ConfirmEmailAction({
 const SIN_CORREO = "El funcionario no tiene correo registrado"
 
 /**
+ * Restablecer solo tiene sentido si la cuenta SSO existe y no está inactiva.
+ * Mientras el estado carga o si la consulta falla el botón queda habilitado:
+ * el backend responde de forma controlada, así que degrada bien.
+ */
+function resetDisabledReason(
+  correo: string | undefined,
+  estado: EstadoCuenta | "error" | undefined,
+): string | undefined {
+  if (!correo) return SIN_CORREO
+  if (estado === "NOT_FOUND") return "El funcionario aún no tiene cuenta; envíale la invitación"
+  if (estado === "INACTIVE") return "La cuenta está inactiva"
+  return undefined
+}
+
+/**
  * Envía el correo de "olvidé mi contraseña" al funcionario, reusando el
  * mismo endpoint público del login (`GET /sso-admin/forgotPassword`, con
  * `app` = la app de PIGSE vía `env.NAME`).
  */
-export function ResetPasswordEmailAction({ employee }: { employee: EmployeeListItem }) {
+export function ResetPasswordEmailAction({
+  employee,
+  estado,
+}: {
+  employee: EmployeeListItem
+  /** `undefined` mientras carga; `"error"` si la consulta falló. */
+  estado: EstadoCuenta | "error" | undefined
+}) {
   const { notify } = useNotify()
   const correo = employee.email?.trim()
   const forgotPassword = useForgotPassword({
@@ -156,17 +178,18 @@ export function ResetPasswordEmailAction({ employee }: { employee: EmployeeListI
           <strong>{correo}</strong>.
         </>
       }
-      disabledReason={correo ? undefined : SIN_CORREO}
+      disabledReason={resetDisabledReason(correo, estado)}
       onConfirm={() => forgotPassword.mutateAsync(correo)}
     />
   )
 }
 
-const MOTIVO_NO_DISPONIBLE: Record<Exclude<EstadoCuenta, "PENDING_ACTIVATION">, string> = {
+const MOTIVO_NO_DISPONIBLE: Record<Exclude<EstadoCuenta, "PENDING_ACTIVATION" | "NOT_FOUND">, string> = {
   ACTIVE: "La cuenta ya está activa; usa restablecer contraseña",
   INACTIVE: "La cuenta está inactiva",
-  NOT_FOUND: "El funcionario no tiene una cuenta registrada",
 }
+
+const INVITE_LABEL = "Enviar invitación para crear la cuenta"
 
 interface ResendActivationEmailActionProps {
   employee: EmployeeListItem
@@ -175,16 +198,22 @@ interface ResendActivationEmailActionProps {
 }
 
 /**
- * Reenvía el correo de activación. Solo se habilita si la cuenta está
- * pendiente de activación (`estado-cuenta` de auth-center).
+ * Reenvía el correo de activación si la cuenta está pendiente, o invita al
+ * funcionario si aún no tiene cuenta SSO (`NOT_FOUND`): en ese caso el
+ * backend crea la cuenta pendiente y envía la invitación.
  */
 export function ResendActivationEmailAction({ employee, estado }: ResendActivationEmailActionProps) {
   const { notify } = useNotify()
   const correo = employee.email?.trim()
+  const isInvite = estado === "NOT_FOUND"
   const reenviar = useReenviarActivacion({
     mutationConfig: {
       onSuccess: () => {
-        notify(`Se envió el correo de activación a ${correo}.`)
+        notify(
+          isInvite
+            ? `Se envió la invitación a ${correo}.`
+            : `Se envió el correo de activación a ${correo}.`,
+        )
       },
       onError: (error) => {
         notify(getErrorMessage(error), { variant: "error" })
@@ -196,18 +225,25 @@ export function ResendActivationEmailAction({ employee, estado }: ResendActivati
   if (!correo) disabledReason = SIN_CORREO
   else if (estado === "error") disabledReason = "No se pudo consultar el estado de la cuenta"
   else if (estado === undefined) disabledReason = "Consultando el estado de la cuenta…"
-  else if (estado !== "PENDING_ACTIVATION") disabledReason = MOTIVO_NO_DISPONIBLE[estado]
+  else if (estado !== "PENDING_ACTIVATION" && estado !== "NOT_FOUND") disabledReason = MOTIVO_NO_DISPONIBLE[estado]
 
   return (
     <ConfirmEmailAction
-      label="Reenviar correo de activación"
+      label={isInvite ? INVITE_LABEL : "Reenviar correo de activación"}
       icon={<EnvelopeIcon />}
-      title="Reenviar activación"
+      title={isInvite ? INVITE_LABEL : "Reenviar activación"}
       description={
-        <>
-          Se reenviará el correo de activación de la cuenta de {employee.name} a{" "}
-          <strong>{correo}</strong>.
-        </>
+        isInvite ? (
+          <>
+            Se creará la cuenta de {employee.name} y se enviará la invitación para activarla a{" "}
+            <strong>{correo}</strong>.
+          </>
+        ) : (
+          <>
+            Se reenviará el correo de activación de la cuenta de {employee.name} a{" "}
+            <strong>{correo}</strong>.
+          </>
+        )
       }
       disabledReason={disabledReason}
       onConfirm={() => reenviar.mutateAsync({ correo })}

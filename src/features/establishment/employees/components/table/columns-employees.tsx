@@ -107,7 +107,10 @@ function ActionsCell({
       ) : null}
       {puedeEditar ? (
         <>
-          <ResetPasswordEmailAction employee={employee} />
+          <ResetPasswordEmailAction
+            employee={employee}
+            estado={resolveEstado(estadosCuenta, employee.email)}
+          />
           <ResendActivationEmailAction
             employee={employee}
             estado={resolveEstado(estadosCuenta, employee.email)}
