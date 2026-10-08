@@ -15,7 +15,7 @@ function exportSelectedCampuses(input: ExportSelectedCampusesInput): Promise<Exp
   // …/reporte lo aplica DESPUES de que la funcion PL/pgSQL corrio su gate,
   // asi que mandar el id de algo que este usuario no puede ver no lo revela
   // — simplemente no aparece.
-  return downloadReport("sedes", { format: input.format, filters: { ids: input.ids } })
+  return downloadReport("pigse-sedes", { format: input.format, filters: { ids: input.ids } })
 }
 
 interface UseExportSelectedOptions {
