@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/icons"
 import { useNotify } from "@/components/notice/notice-context"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { getNavIcon } from "@/features/navigation/api/ui-mappings"
 import { getErrorMessage } from "@/lib/api-client"
@@ -138,6 +139,7 @@ function MenuRow({
   extra,
   tools,
   handle,
+  readOnlyControl,
   isDragging,
   dropProps,
   dragProps,
@@ -152,6 +154,8 @@ function MenuRow({
   tools?: ReactNode
   /** Manija de arrastre; acompaña a las herramientas. */
   handle?: ReactNode
+  /** Checkbox "Solo lectura"; solo aplica a filas del panel de asignados. */
+  readOnlyControl?: ReactNode
   /** La fila que se está arrastrando: se apaga mientras viaja. */
   isDragging?: boolean
   /** La fila entera recibe el drop, no solo la manija. */
@@ -189,6 +193,7 @@ function MenuRow({
       <span className={cn("min-w-0 flex-1 truncate text-sm", depth === 0 && "font-medium")}>
         {node.name}
       </span>
+      {readOnlyControl}
       {tools || handle ? (
         // Ocultas hasta el hover para no ensuciar la lista, pero visibles con
         // el foco: si no, no habría forma de llegar a ellas por teclado.
@@ -261,7 +266,37 @@ interface MenuTransferProps {
   assignedIds: number[]
   onAssign: (ids: number[]) => void
   onUnassign: (ids: number[]) => void
+  readOnlyIds: Set<number>
+  onToggleReadOnly: (id: number, checked: boolean) => void
   disabled?: boolean
+}
+
+function ReadOnlyToggle({
+  id,
+  checked,
+  disabled,
+  onChange,
+}: {
+  id: number
+  checked: boolean
+  disabled?: boolean
+  onChange: (id: number, checked: boolean) => void
+}) {
+  const inputId = `readonly-${id}`
+  return (
+    <label
+      htmlFor={inputId}
+      className="flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground"
+    >
+      <Checkbox
+        id={inputId}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={(value) => onChange(id, value === true)}
+      />
+      Solo lectura
+    </label>
+  )
 }
 
 /**
@@ -279,6 +314,8 @@ export function MenuTransfer({
   assignedIds,
   onAssign,
   onUnassign,
+  readOnlyIds,
+  onToggleReadOnly,
   disabled,
 }: MenuTransferProps) {
   const [availableSearch, setAvailableSearch] = useState("")
@@ -631,6 +668,14 @@ export function MenuTransfer({
                     <MenuRow
                       node={group}
                       depth={0}
+                      readOnlyControl={
+                        <ReadOnlyToggle
+                          id={group.id}
+                          checked={readOnlyIds.has(group.id)}
+                          disabled={disabled}
+                          onChange={onToggleReadOnly}
+                        />
+                      }
                       extra={
                         children.length > 0 && (
                           <Button
@@ -666,6 +711,14 @@ export function MenuTransfer({
                           key={child.id}
                           node={child}
                           depth={1}
+                          readOnlyControl={
+                            <ReadOnlyToggle
+                              id={child.id}
+                              checked={readOnlyIds.has(child.id)}
+                              disabled={disabled}
+                              onChange={onToggleReadOnly}
+                            />
+                          }
                           action={
                             disabled ? undefined : (
                               <MoveButton
