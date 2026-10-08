@@ -122,7 +122,14 @@ const PUBLIC_ENDPOINTS = [
 // las respuestas posibles. Cada pantalla decide qué mostrar, así que no
 // tostean. El resto de los públicos (restore/forgot) sí avisa: ahí el error
 // es el resultado de una acción que el usuario disparó.
-const PROBE_ENDPOINTS = ["/auth/refresh", "/sso-admin/resetTokenStatus"]
+const PROBE_ENDPOINTS = [
+  "/auth/refresh",
+  "/sso-admin/resetTokenStatus",
+  // Estado de cuentas de la tabla de funcionarios: si falla, la tabla degrada
+  // sola (botones de correo). Nunca debe disparar toast, redirección por
+  // sesión vencida ni revalidación por 403 (en CE eso causó un loop de recarga).
+  "/auth/register/pigse/funcionario/estado-cuenta",
+]
 
 // El módulo de periodos académicos ya muestra sus propios avisos (banner
 // inline en el diálogo o `notify()`/NoticeOutlet de página) para cada
@@ -202,7 +209,8 @@ api.interceptors.response.use(
     // Sin guard, un 401 en /login mismo (todavía no existe esa página)
     // reintentaría redirigir a /login en loop infinito.
     const onLoginPage = window.location.pathname === paths.auth.login.path
-    let isExpiredSession = isUnauthorized && !onLoginPage && !isPublicEndpoint
+    const isProbe = PROBE_ENDPOINTS.some((endpoint) => requestUrl.startsWith(endpoint))
+    let isExpiredSession = isUnauthorized && !onLoginPage && !isPublicEndpoint && !isProbe
 
     // El backend dice explícitamente que el token no sirve (vencido, mal
     // firmado, revocado). Hay que soltarlo SIEMPRE, incluso en la pantalla de
@@ -228,7 +236,7 @@ api.interceptors.response.use(
     // vencida (evita pedir el refresh una vez por cada request que venía
     // en vuelo).
     const isForbidden = error.response?.status === 403
-    if (isForbidden && !onLoginPage && !isPublicEndpoint && !isHandlingExpiredSession) {
+    if (isForbidden && !onLoginPage && !isPublicEndpoint && !isProbe && !isHandlingExpiredSession) {
       try {
         const { token }: AuthResponse = await api.post("/auth/refresh")
         setAuthToken(token)
@@ -244,8 +252,6 @@ api.interceptors.response.use(
     if (isExpiredSession && isHandlingExpiredSession) {
       return Promise.reject(error)
     }
-
-    const isProbe = PROBE_ENDPOINTS.some((endpoint) => requestUrl.startsWith(endpoint))
 
     if (!isProbe && !suppressGlobalErrorToast && !isExpiredSession) {
       toast.error(getErrorMessage(error))
