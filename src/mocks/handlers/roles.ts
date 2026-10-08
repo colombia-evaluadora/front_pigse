@@ -41,6 +41,9 @@ function rows<T>(data: T[], init?: ResponseInit) {
 /** Orden del menú de cada rol: la lista de ids tal como se guardó. */
 const roleMenuOrder = new Map<number, number[]>()
 
+/** Menús marcados "Solo lectura" por rol (`role_route.puede_*` en el backend). */
+const roleReadOnly = new Map<number, Set<number>>()
+
 export const rolesHandlers = [
   http.get("/api/pigse/roles", async () => {
     await delay(150)
@@ -226,13 +229,15 @@ export const rolesHandlers = [
           ...assigned.filter((id) => !saved.includes(id)),
         ]
 
-    return rows(ids.map((id) => ({ id })))
+    const readOnly = roleReadOnly.get(roleId) ?? new Set<number>()
+    return rows(ids.map((id) => ({ id, soloLectura: readOnly.has(id) })))
   }),
 
   http.put("/api/pigse/roles/:roleId/menus", async ({ params, request }) => {
     await delay(200)
     const roleId = Number(params.roleId)
-    const { menuIds } = (await request.json()) as { menuIds: number[] }
+    const { menus } = (await request.json()) as { menus: { id: number; soloLectura: boolean }[] }
+    const menuIds = menus.map((menu) => menu.id)
 
     if (!rolesDb.some((role) => role.id === roleId)) {
       return HttpResponse.json(
@@ -253,6 +258,7 @@ export const rolesHandlers = [
     }
 
     roleMenuOrder.set(roleId, menuIds)
+    roleReadOnly.set(roleId, new Set(menus.filter((menu) => menu.soloLectura).map((menu) => menu.id)))
 
     return rows<UpdateRoleMenusResult>([{ status: "success", message: "Menús actualizados." }])
   }),
