@@ -1,3 +1,5 @@
+"use no memo"
+
 import type { ColumnDef } from "@tanstack/react-table"
 
 import { Badge } from "@/components/ui/badge"
@@ -13,10 +15,24 @@ import {
 } from "@/features/establishment/employees/api/ui-mappings"
 import type { EmployeeListItem } from "@/features/establishment/employees/api/types/employee"
 import { DeleteEmployeeDialog } from "@/features/establishment/employees/components/dialogs/dialog-delete"
+import {
+  ResendActivationEmailAction,
+  ResetPasswordEmailAction,
+} from "@/features/establishment/employees/components/dialogs/dialog-account-emails"
+import {
+  toCorreoKey,
+  type EstadoCuenta,
+} from "@/features/establishment/employees/api/query/use-estado-cuenta"
 import { useMenuPermission } from "@/features/navigation/api/use-menu-permission"
 
 interface EmployeeColumnsOptions {
   onEdit: (employeeId: number) => void
+  /**
+   * Estado de la cuenta SSO por correo (ver `useEstadoCuentaQuery`).
+   * `undefined` mientras carga; `"error"` si la consulta falló — la tabla
+   * sigue funcionando y solo se deshabilita "Reenviar activación".
+   */
+  estadosCuenta: Map<string, EstadoCuenta> | "error" | undefined
 }
 
 // Cuántas sedes se listan por nombre antes de resumir el resto en un "+N".
@@ -67,9 +83,11 @@ export function renderStatusCell(statuses: EmployeeListItem["statuses"]) {
 function ActionsCell({
   employee,
   onEdit,
+  estadosCuenta,
 }: {
   employee: EmployeeListItem
   onEdit: (id: number) => void
+  estadosCuenta: EmployeeColumnsOptions["estadosCuenta"]
 }) {
   const { puedeEditar } = useMenuPermission("FUNCIONARIOS")
 
@@ -87,12 +105,33 @@ function ActionsCell({
           <PencilIcon />
         </Button>
       ) : null}
+      {puedeEditar ? (
+        <>
+          <ResetPasswordEmailAction employee={employee} />
+          <ResendActivationEmailAction
+            employee={employee}
+            estado={resolveEstado(estadosCuenta, employee.email)}
+          />
+        </>
+      ) : null}
       <DeleteEmployeeDialog employee={employee} />
     </div>
   )
 }
 
-export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<EmployeeListItem>[] {
+/** Una cuenta que el back no devolvió se trata como inexistente. */
+function resolveEstado(
+  estadosCuenta: EmployeeColumnsOptions["estadosCuenta"],
+  correo: string,
+): EstadoCuenta | "error" | undefined {
+  if (estadosCuenta === "error" || estadosCuenta === undefined) return estadosCuenta
+  return estadosCuenta.get(toCorreoKey(correo)) ?? "NOT_FOUND"
+}
+
+export function createColumns({
+  onEdit,
+  estadosCuenta,
+}: EmployeeColumnsOptions): ColumnDef<EmployeeListItem>[] {
   return [
     {
       id: "select",
@@ -243,10 +282,11 @@ export function createColumns({ onEdit }: EmployeeColumnsOptions): ColumnDef<Emp
     {
       id: "actions",
       header: () => <span className="sr-only">Acciones</span>,
-      cell: ({ row }) => <ActionsCell employee={row.original} onEdit={onEdit} />,
+      cell: ({ row }) => <ActionsCell employee={row.original} onEdit={onEdit} estadosCuenta={estadosCuenta} />,
       enableSorting: false,
       enableHiding: false,
-      size: 96,
+      // 48 por botón: editar, restablecer contraseña, reenviar activación y eliminar.
+      size: 192,
     },
   ]
 }

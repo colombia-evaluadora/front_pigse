@@ -124,6 +124,7 @@ function toEmployeeListItem(row: RealEmployeeListRow): EmployeeListItem {
     id: row.pk_funcionario,
     documentNumber: row.identificacion,
     name,
+    email: row.correo_electronico ?? "",
     establishmentName: row.establecimiento_nombre,
     roles: Array.from(rolesById, ([id, roleName]) => ({ id, code: "", name: roleName })),
     campuses: Array.from(campusNames),
