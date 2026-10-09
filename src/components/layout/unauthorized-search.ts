@@ -1,18 +1,17 @@
 import { z } from "zod"
 
 /**
- * Schema del search-params de la ruta `/app/no-autorizado`. Vive en su
- * propio archivo para romper la dependencia circular entre `router.tsx`
- * (que define la ruta) y `unauthorized-page.tsx` (que la lee): los dos
- * importan de acá en vez de uno del otro.
+ * Search params de `/app/sin-acceso`. Vive en su propio archivo para que
+ * `router.tsx` (que define la ruta) no tenga que importarlos de la página.
  *
- * - `from`: pathname del recurso al que el usuario intentó entrar.
- * - `home`: path del primer menú permitido del usuario (alimenta el botón
- *   "Ir a mi inicio").
+ * - `desde`: pathname al que el usuario intentó entrar. Solo
+ *   deja rastro en la barra de direcciones (para soporte / QA); la pantalla
+ *   no la muestra ni navega a ella.
+ *
+ * Una URL inválida nunca tira: cae a `undefined`.
  */
 export const unauthorizedSearchSchema = z.object({
-  from: z.string().optional(),
-  home: z.string().optional(),
+  desde: z.string().optional().catch(undefined),
 })
 
 export type UnauthorizedSearch = z.infer<typeof unauthorizedSearchSchema>
