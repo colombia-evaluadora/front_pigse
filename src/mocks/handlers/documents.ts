@@ -1,5 +1,7 @@
 import { delay, http, HttpResponse } from "msw"
 
+import { complianceFilesById } from "@/mocks/db/compliance"
+
 import {
   documentsDb,
   documentCategoriesDb,
@@ -122,7 +124,9 @@ function buildMockPdf(texto: string): string {
 function findFileByArchivoId(archivoId: string | undefined): { fileName: string | null } | undefined {
   return (
     documentsDb.find((d) => String(d.archivoId) === String(archivoId)) ??
-    documentCategoriesDb.find((c) => String(c.archivoId) === String(archivoId))
+    documentCategoriesDb.find((c) => String(c.archivoId) === String(archivoId)) ??
+    // Archivos de los EE del tablero de Monitoreo (otro mock, mismo binario).
+    complianceFilesById.get(Number(archivoId))
   )
 }
 

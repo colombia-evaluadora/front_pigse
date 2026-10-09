@@ -34,6 +34,14 @@ export const visorSearchSchema = z.object({
    * que el front no hardcodee la forma de la URL del file-service.
    */
   downloadUrl: z.string().optional().catch(undefined),
+  /**
+   * De dónde se abrió el visor: decide a dónde vuelve "Volver" y de dónde
+   * sale la lista de archivos del selector. `monitoreo` necesita además el
+   * establecimiento (el detalle documental es por EE); `gestion` es siempre
+   * el EE del token. Sin origen (enlaces viejos) no hay selector.
+   */
+  origen: z.enum(["monitoreo", "gestion"]).optional().catch(undefined),
+  establecimientoId: z.coerce.number().int().positive().optional().catch(undefined),
 })
 
 export type VisorSearch = z.infer<typeof visorSearchSchema>

@@ -24,7 +24,7 @@ export function ComplianceMetricsCards() {
 
   if (isPending || !metrics) {
     return (
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
           <Card key={index} size="sm">
             <CardContent className="h-24 animate-pulse rounded-md bg-muted/40" />
@@ -35,7 +35,7 @@ export function ComplianceMetricsCards() {
   }
 
   return (
-    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
       <TotalEstablishmentsCard value={metrics.totalEstablishments} />
       <KpiDonutCard
         label="Avance PEI"
@@ -76,7 +76,7 @@ export function ComplianceMetricsCards() {
  */
 function TotalEstablishmentsCard({ value }: { value: number }) {
   return (
-    <Card size="sm">
+    <Card size="sm" className="col-span-2 xl:col-span-1">
       <CardContent className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue/10 text-blue">
           <BuildingsIcon weight="fill" className="size-5" />

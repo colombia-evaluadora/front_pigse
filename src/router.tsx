@@ -28,6 +28,7 @@ import { campusesSearchSchema } from "@/features/establishment/campuses/api/sche
 import { employeesSearchSchema } from "@/features/establishment/employees/api/schema"
 import { NoticeProvider } from "@/components/notice/notice-context"
 import { visorSearchSchema } from "@/features/pdf-viewer/api/schema"
+import { monitoringSearchSchema } from "@/features/monitoring/api/schema"
 import {
   auditsSearchSchema,
   auditTablesSearchSchema,
@@ -136,6 +137,10 @@ const MonitoringCompliancePage = lazyRouteComponent(
   "MonitoringCompliancePage",
 )
 
+const MonitoringDocumentDetailPage = lazyRouteComponent(
+  () => import("@/features/monitoring/pages/monitoring-document-detail-page"),
+  "MonitoringDocumentDetailPage",
+)
 const PdfViewerPage = lazyRouteComponent(
   () => import("@/features/pdf-viewer/pages/pdf-viewer-page"),
   "PdfViewerPage",
@@ -589,10 +594,35 @@ export const gestionDocumentalDetalleRoute = createRoute({
 export const monitoreoCumplimientoRoute = createRoute({
   getParentRoute: () => menuGuardRoute,
   path: paths.app.monitoreoCumplimiento.path,
+  validateSearch: monitoringSearchSchema,
   staticData: {
     breadcrumb: [MONITOREO_CRUMB, { label: "Monitoreo y cumplimiento" }],
   },
   component: MonitoringCompliancePage,
+})
+
+// Detalle documental de UN establecimiento x tipo (V555.1). Un tipo o un id
+// inválidos vuelven al tablero en vez de pintar una pantalla sin datos.
+export const monitoreoCumplimientoDetalleRoute = createRoute({
+  getParentRoute: () => menuGuardRoute,
+  path: paths.app.monitoreoCumplimientoDetalle.path,
+  beforeLoad: ({ params }) => {
+    const id = Number(params.establecimientoId)
+    const tipoValido = DOCUMENT_TYPES_WITH_ROUTE.includes(
+      params.tipo as (typeof DOCUMENT_TYPES_WITH_ROUTE)[number],
+    )
+    if (!tipoValido || !Number.isInteger(id) || id <= 0) {
+      throw redirect({ to: paths.app.monitoreoCumplimiento.getHref() })
+    }
+  },
+  staticData: {
+    breadcrumb: (params: Record<string, string>) => [
+      MONITOREO_CRUMB,
+      { label: "Monitoreo y cumplimiento", to: paths.app.monitoreoCumplimiento.getHref() },
+      { label: documentTypeDisplayName(params.tipo as "PEI" | "PEC" | "PMI" | "PFI") },
+    ],
+  },
+  component: MonitoringDocumentDetailPage,
 })
 
 export const visorRoute = createRoute({
@@ -600,7 +630,7 @@ export const visorRoute = createRoute({
   path: paths.app.visor.path,
   validateSearch: visorSearchSchema,
   staticData: {
-    breadcrumb: [MONITOREO_CRUMB, { label: "Visor de PDF" }],
+    breadcrumb: [MONITOREO_CRUMB, { label: "Visor de documentos" }],
   },
   component: PdfViewerPage,
 })
@@ -655,6 +685,7 @@ const routeTree = rootRoute.addChildren([
       gestionDocumentalDetalleRoute,
       gestionDocumentalFechaLimiteRoute,
       monitoreoCumplimientoRoute,
+      monitoreoCumplimientoDetalleRoute,
       visorRoute,
     ]),
   ]),
