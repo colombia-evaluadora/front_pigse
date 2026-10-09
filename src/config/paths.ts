@@ -132,14 +132,15 @@ export const paths = {
       getHref: (type: string) => `/app/visor/${type}`,
     },
     /**
-     * Página "No autorizado": la pinta `appLayoutRoute.beforeLoad` cuando
-     * un usuario autenticado intenta entrar a una URL que no está en su
-     * menú (ver `lib/auth-routes.ts`). El query param `from` trae la URL
-     * original y `home` la primera ruta permitida del usuario.
+     * Página "Sin acceso": a donde redirige el guard de rutas
+     * (`menuGuardRoute` en `router.tsx`) cuando un usuario autenticado
+     * intenta entrar a una URL que no está en su menú (ver
+     * `features/navigation/lib/route-access.ts`), y `/app` cuando el usuario
+     * no tiene ningún menú. `?desde=` trae la URL original.
      */
     unauthorized: {
-      path: "no-autorizado",
-      getHref: () => "/app/no-autorizado",
+      path: "sin-acceso",
+      getHref: () => "/app/sin-acceso",
     },
     // Las dos vistas del registro de actividad (por sesión y por tablas)
     // cuelgan del mismo prefijo `registro-de-actividad` para que el item del
@@ -165,8 +166,8 @@ export const paths = {
      * Actividad de usuarios: listado de funcionarios (rectores y
      * secretarios) que ya usaron la plataforma, con su último ingreso y un
      * badge de estado (`CON_INGRESO`/`SIN_INGRESO`). Pensada
-     * para la secretaría territorial — ver `USER_ACTIVITY_VIEWERS` en
-     * `lib/auth-routes.ts` para los roles habilitados. Vive fuera del
+     * para la secretaría territorial — los roles habilitados son los que
+     * tienen el menú (V499, `role_route`). Vive fuera del
      * grupo "Registro de actividad" (auditoría de cambios en BD): es otro
      * dominio, aunque comparta la sección "Administración" del menú.
      */

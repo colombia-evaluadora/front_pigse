@@ -276,6 +276,13 @@ export function isNotFoundError(error: unknown): boolean {
   return Axios.isAxiosError(error) && error.response?.status === 404
 }
 
+// Un 403 que sobrevivió a la revalidación de sesión del interceptor (si el
+// refresh hubiera fallado, ya se estaría redirigiendo al login): el backend
+// confirma que esta sesión, válida, no tiene permiso para el recurso.
+export function isForbiddenError(error: unknown): boolean {
+  return Axios.isAxiosError(error) && error.response?.status === 403
+}
+
 // Mismo mensaje que ya muestra el toast global del interceptor (arriba),
 // pero para diálogos que quieren mostrarlo en su propio banner en vez de (o
 // además de) el toast — p.ej. para que no quede detrás del overlay del

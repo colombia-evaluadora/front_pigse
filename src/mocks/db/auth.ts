@@ -69,7 +69,7 @@ export const authUsers: (User & {
     document: "4567890123",
   },
   {
-    // Autenticado en el SSO pero SIN rol de PIGSE: cae en /no-autorizado.
+    // Autenticado en el SSO pero SIN rol de PIGSE: menú vacío, cae en /sin-acceso.
     // En la BD hay ~34 usuarios así.
     id: "2",
     email: "user@example.com",

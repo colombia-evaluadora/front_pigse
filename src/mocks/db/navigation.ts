@@ -98,8 +98,7 @@ export const navigationMenu: MockMenu[] = [
     idParent: 100,
     // PIGSE-ADMINISTRADOR, PIGSE-SECRETARIA_TERRITORIAL, PIGSE-SECRETARIO,
     // PIGSE-JEFE_AREA_CALIDAD, PIGSE-JEFE_AREA_PLANEACION,
-    // PIGSE-JEFE_AREA_COBERTURA (mismos 6 roles que acepta V495 en el back,
-    // ver USER_ACTIVITY_VIEWERS en lib/auth-routes.ts)
+    // PIGSE-JEFE_AREA_COBERTURA (mismos 6 roles que acepta V495 en el back)
     roleIds: [840, 839, 841, 834, 831, 838],
   },
   {
