@@ -24,9 +24,13 @@ async function fetchDocumentCategories(type: DocumentType): Promise<DocumentCate
 
 export const documentCategoriesQueryKey = (type: DocumentType) => ["documents", type, "categories"] as const
 
-export function useDocumentCategoriesQuery(type: DocumentType) {
+export function useDocumentCategoriesQuery(
+  type: DocumentType,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: documentCategoriesQueryKey(type),
     queryFn: () => fetchDocumentCategories(type),
+    enabled,
   })
 }

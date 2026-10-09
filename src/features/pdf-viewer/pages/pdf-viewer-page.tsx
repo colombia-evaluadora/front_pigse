@@ -1,13 +1,15 @@
 import { useState } from "react"
-import { Link, useParams, useSearch } from "@tanstack/react-router"
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 
 import {
   ArrowLeftIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
   FileDownloadOutlinedIcon,
-  FilePdfIcon,
   SpinnerIcon,
 } from "@/components/ui/icons"
 import { Button } from "@/components/ui/button"
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
   TableScreen,
   TableScreenBody,
@@ -16,9 +18,12 @@ import {
 } from "@/components/layout/table-screen"
 import { paths } from "@/config/paths"
 import { downloadArchivo } from "@/lib/files"
+import { cn } from "@/lib/utils"
 import { useNotify } from "@/components/notice/notice-context"
 import { useArchivoBlob } from "@/features/files/api/query/use-archivo-blob"
+import { fileKindMeta, isPreviewable } from "@/features/files/lib/file-kind"
 import { PdfDocumentViewer } from "@/features/pdf-viewer/components/pdf-document-viewer"
+import { useViewerFiles, type ViewerFile } from "@/features/pdf-viewer/api/use-viewer-files"
 
 import {
   documentTypeDisplayName,
@@ -34,79 +39,59 @@ function isDocumentType(value: string): value is DocumentType {
 }
 
 /**
- * Alto del área de lectura.
- *
- * Es FIJO y atado al viewport, no `h-full`: `h-full` solo funciona si cada
- * padre de la cadena tiene altura definida, y `TableScreenBody` es `grow`
- * dentro de un contenedor que no la fija. Sin esto la card crecía con el
- * documento y terminaba scrolleando la ventana entera en vez de scrollear
- * ella.
- *
- * Los ~13rem que se restan son el cromo que la rodea: el header de la app
- * (`h-14` = 3.5rem), el `TableScreenTitle` con su bajada (~5.5rem), el
- * `py-4` del `TableScreenBody` (2rem) y el `pb-4` del layout (1rem). Si se
- * le agrega una pieza al encabezado (una barra de herramientas, pestañas),
- * hay que ajustar este número.
- *
- * `svh` y no `vh` para que en móvil no la tape la barra del navegador. El
- * `min-h` es el piso: en una ventana muy baja, mejor que scrollee la página
- * a que el visor quede de un alto ilegible.
+ * Alto del área de lectura: FIJO y atado al viewport (`h-full` no funciona
+ * porque `TableScreenBody` no fija altura). Se resta el cromo que la rodea:
+ * header de la app, título con bajada, padding del body y del layout (~13rem)
+ * y, cuando hay selector de archivos, su barra (~3.5rem). `svh` para que en
+ * móvil no la tape la barra del navegador; el `min-h` es el piso legible.
+ * Clases literales: Tailwind no ve strings armados.
  */
 const ALTO_VISOR = "h-[calc(100svh-13rem)] min-h-80"
+const ALTO_VISOR_CON_SELECTOR = "h-[calc(100svh-16.5rem)] min-h-80"
 
 /**
- * Visor de PDF del documento vigente de un establecimiento.
+ * Visor de documentos institucionales. Abre UN archivo (`archivoId`) y, si
+ * se llegó desde el detalle documental (monitoreo) o desde los anexos
+ * (gestión documental), ofrece saltar entre los demás archivos del mismo
+ * documento y volver exactamente a esa pantalla.
  *
- * Se accede desde dos lugares:
- *   - El botón "Consultar" del `DocumentDetailPopover` (vista
- *     institucional del EE).
- *   - El botón "Consultar Documento" del `ComplianceStatusCell`
- *     (vista del monitor, una fila por EE).
- *
- * El parámetro `type` viene del segmento de la URL (`visor/$type`).
- * `establishmentName` y `fileName` viajan como query params para que
- * el encabezado muestre el contexto del archivo sin tener que volver a
- * pegarle al backend solo para el título.
+ * Solo el PDF se previsualiza (pdf.js); Word/Excel muestran un aviso con la
+ * descarga. La referencia al binario llega por la URL y no consultando
+ * `/documentos`: los roles del tablero no tienen permiso ahí (ver
+ * `visorSearchSchema`).
  */
 export function PdfViewerPage() {
   const params = useParams({ strict: false }) as { type?: string }
   const search = useSearch({ strict: false }) as VisorSearch
+  const navigate = useNavigate()
 
   const rawType = params.type ?? ""
   const type: DocumentType = isDocumentType(rawType) ? rawType : "PEI"
   const displayName = documentTypeDisplayName(type)
-  const establishmentName = search.establishmentName
-  const fileName = search.fileName ?? `${type}_documento.pdf`
 
-  // El visor recibe solo el `type` por la URL, no el `downloadUrl`. Se lo pide
-  // a la lista de documentos, que ya está en cache de React Query (la pantalla
-  // de gestión documental la dejó cargada al navegar hasta acá).
-  // El archivo llega por la URL, NO se resuelve consultando `/documentos`.
-  // Ver el javadoc de `visorSearchSchema`: al visor se llega desde Gestión
-  // documental (EE propio) y desde Monitoreo (cualquier EE), y los roles
-  // territoriales del segundo caso no tienen permiso sobre `/documentos`.
+  const { files, establishmentName: nombreDesdeDetalle } = useViewerFiles(search, type)
+  const establishmentName = search.establishmentName ?? nombreDesdeDetalle
+
   const { archivoId } = search
-  // Con `archivoId` alcanza para descargar: si la fila no trajo `downloadUrl`
-  // se arma con el mismo formato que usa el backend.
+  const actual = files.find((file) => file.archivoId === archivoId)
+  const fileName = search.fileName ?? actual?.fileName ?? `${type}_documento.pdf`
   const downloadUrl =
-    search.downloadUrl ?? (archivoId != null ? `/api/files/download/${archivoId}` : undefined)
-  // PMI/PFI suelen cargarse en Word: pdf.js solo abre PDF, así que el resto
-  // ni se baja para previsualizar (se ofrece solo la descarga).
-  const esPdf = !search.fileName || /\.pdf$/i.test(search.fileName)
-  // El binario se baja con el cliente autenticado y se le pasa a pdf.js como
-  // Blob. Si el usuario pasó el cursor por la fila antes de entrar, ya está
-  // cacheado (ver el prefetch del popover) y la pantalla abre instantánea.
-  const { data: archivo, isPending: archivoPending } = useArchivoBlob(
-    esPdf ? archivoId : undefined,
-    downloadUrl,
-  )
+    search.downloadUrl ??
+    actual?.downloadUrl ??
+    (archivoId != null ? `/api/files/download/${archivoId}` : undefined)
+  const esPdf = isPreviewable(search.fileName ?? actual?.fileName)
 
-  // En React Query v5 una query DESHABILITADA reporta `isPending`, no `idle`.
-  // Si se mirara `archivoPending` a secas, un documento sin archivo (donde el
-  // hook queda deshabilitado por `archivoId == null`) mostraría el spinner
-  // para siempre en vez del mensaje de "todavía no hay archivo". Por eso el
-  // spinner exige que EXISTA algo que cargar.
-  const cargando = esPdf && archivoId != null && archivoPending
+  const {
+    data: archivo,
+    isPending: archivoPending,
+    isError: archivoError,
+    refetch: reintentar,
+  } = useArchivoBlob(esPdf ? archivoId : undefined, downloadUrl)
+
+  // Una query DESHABILITADA reporta `isPending` (React Query v5): el spinner
+  // exige que exista algo que cargar, si no un documento sin archivo
+  // quedaría cargando para siempre.
+  const cargando = esPdf && archivoId != null && archivoPending && !archivoError
 
   const [descargando, setDescargando] = useState(false)
   const { notify } = useNotify()
@@ -125,18 +110,36 @@ export function PdfViewerPage() {
     }
   }
 
-  // Volvemos al lugar del que vinieron: gestión documental del EE o el
-  // tablero del monitor, según `establishmentName`.
-  const backTo = establishmentName
-    ? paths.app.monitoreoCumplimiento.getHref()
-    : paths.app.gestionDocumental.getHref()
+  function abrir(file: ViewerFile) {
+    navigate({
+      to: paths.app.visor.getHref(type),
+      search: {
+        ...search,
+        archivoId: file.archivoId,
+        fileName: file.fileName ?? undefined,
+        downloadUrl: file.downloadUrl,
+      },
+      replace: true,
+    })
+  }
+
+  const backTo =
+    search.origen === "monitoreo" && search.establecimientoId != null
+      ? paths.app.monitoreoCumplimientoDetalle.getHref(search.establecimientoId, type)
+      : search.origen === "gestion"
+        ? paths.app.gestionDocumentalDetalle.getHref(type)
+        : establishmentName
+          ? paths.app.monitoreoCumplimiento.getHref()
+          : paths.app.gestionDocumental.getHref()
+
+  const indice = files.findIndex((file) => file.archivoId === archivoId)
+  const conSelector = files.length > 1
+  const alto = conSelector ? ALTO_VISOR_CON_SELECTOR : ALTO_VISOR
+  const meta = fileKindMeta(fileName)
 
   return (
     <TableScreen>
       <TableScreenHeader>
-        {/* El nombre del archivo va como bajada del título y no como una
-            franja aparte: es el subtítulo natural del documento, igual que
-            "IE DENZIL EDUCATIVA · DETALLE DOCUMENTOS" en gestión documental. */}
         <TableScreenTitle
           description={
             <span className="block truncate">
@@ -145,9 +148,6 @@ export function PdfViewerPage() {
             </span>
           }
           action={
-            // "Volver" va acá y no a la izquierda del título: es el mismo
-            // criterio que las operaciones de auditoría (ver el docstring de
-            // `TableScreenTitle`).
             <div className="flex shrink-0 items-center gap-2">
               <Button
                 variant="outline"
@@ -183,53 +183,125 @@ export function PdfViewerPage() {
       </TableScreenHeader>
 
       <TableScreenBody>
-        {archivo?.blob ? (
-          /*
-            El PDF se renderiza con pdf.js (vía `react-pdf`) sobre un canvas:
-            sin `<iframe>`, sin `<object>` y sin `<embed>`. Un frame no era
-            controlable ni observable —si el binario fallaba, el navegador
-            pintaba SU página de error dentro de nuestra UI y la app no se
-            enteraba— y además quedaba a merced de `X-Frame-Options`.
+        {conSelector ? (
+          <div className="mb-3 flex items-center gap-2">
+            <Button
+              variant="outline"
+              color="neutral"
+              size="icon-sm"
+              type="button"
+              aria-label="Archivo anterior"
+              disabled={indice <= 0}
+              onClick={() => abrir(files[indice - 1])}
+            >
+              <CaretLeftIcon />
+            </Button>
+            <label htmlFor="visor-archivo" className="sr-only">
+              Archivo del documento
+            </label>
+            <NativeSelect
+              id="visor-archivo"
+              className="min-w-0 flex-1"
+              value={indice >= 0 ? String(files[indice].archivoId) : ""}
+              onChange={(event) => {
+                const elegido = files.find((file) => String(file.archivoId) === event.target.value)
+                if (elegido) abrir(elegido)
+              }}
+            >
+              {indice < 0 ? <NativeSelectOption value="">{fileName}</NativeSelectOption> : null}
+              {files.map((file) => (
+                <NativeSelectOption key={file.archivoId} value={String(file.archivoId)}>
+                  {file.categoriaName} — {file.fileName ?? `Archivo ${file.archivoId}`}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <span className="hidden text-xs whitespace-nowrap text-muted-foreground tabular-nums sm:inline">
+              {indice >= 0 ? `${indice + 1} de ${files.length}` : `${files.length} archivos`}
+            </span>
+            <Button
+              variant="outline"
+              color="neutral"
+              size="icon-sm"
+              type="button"
+              aria-label="Archivo siguiente"
+              disabled={indice < 0 || indice >= files.length - 1}
+              onClick={() => abrir(files[indice + 1])}
+            >
+              <CaretRightIcon />
+            </Button>
+          </div>
+        ) : null}
 
-            Se le pasa el `Blob` y no una URL: el endpoint exige
-            `Authorization: Bearer` y pdf.js pide el binario internamente con
-            `fetch`, sin forma de inyectarle cabeceras. Bajándolo antes con el
-            cliente autenticado, pdf.js ni toca la red.
+        {archivo?.blob && esPdf ? (
+          /*
+            pdf.js (vía `react-pdf`) sobre canvas, sin iframe: un frame no
+            avisa si el binario falla y queda a merced de X-Frame-Options. Se
+            le pasa el Blob ya bajado con el cliente autenticado porque pdf.js
+            no puede mandar `Authorization`.
           */
           <PdfDocumentViewer
+            key={archivoId}
             file={archivo.blob}
             title={`${displayName} · ${fileName}`}
-            // Ya está DENTRO de la card que pone `TableScreenBody`, así que
-            // solo lleva un borde que delimite el área de lectura del padding
-            // de la card — nada de fondo ni sombra propios.
-            className={`overflow-hidden rounded-md border border-border ${ALTO_VISOR}`}
+            className={cn("overflow-hidden rounded-md border border-border", alto)}
           />
         ) : (
           <div
-            className={`flex w-full flex-col items-center justify-center gap-4 rounded-md border border-border p-8 ${ALTO_VISOR}`}
+            role={cargando ? "status" : undefined}
+            className={cn(
+              "flex w-full flex-col items-center justify-center gap-4 rounded-md border border-border p-8",
+              alto,
+            )}
           >
             {cargando ? (
               <>
-                <SpinnerIcon
-                  className="size-8 animate-spin text-muted-foreground"
-                  aria-hidden="true"
-                />
+                <SpinnerIcon className="size-8 animate-spin text-muted-foreground" aria-hidden />
                 <p className="m-0! text-sm text-muted-foreground">Abriendo el documento…</p>
               </>
             ) : (
               <>
-                <FilePdfIcon className="size-16 text-red" aria-hidden="true" />
+                <span
+                  className={cn("flex size-16 items-center justify-center rounded-xl", meta.tone)}
+                >
+                  <meta.Icon className="size-9" aria-hidden />
+                </span>
                 <div className="text-center">
-                  <p className="m-0! text-lg font-semibold text-pretty">{fileName}</p>
+                  <p className="m-0! text-lg font-semibold text-pretty break-all">{fileName}</p>
                   <p className="m-0! mt-1 text-sm text-muted-foreground">{displayName}</p>
                 </div>
                 <p className="m-0! max-w-md text-center text-sm text-muted-foreground">
                   {archivoId == null
-                    ? "Este documento todavía no tiene un archivo cargado."
+                    ? "No se indicó qué archivo abrir. Vuelve al detalle y elige un archivo."
                     : !esPdf
-                      ? "Vista previa no disponible. Descarga el archivo para verlo."
-                      : "No se pudo abrir el documento. Volvé a intentar desde el listado."}
+                      ? `Vista previa no disponible para archivos ${meta.label}. Descarga el archivo para verlo.`
+                      : "No se pudo abrir el documento."}
                 </p>
+                {archivoId != null ? (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {esPdf && archivoError ? (
+                      <Button
+                        variant="outline"
+                        color="neutral"
+                        size="sm"
+                        type="button"
+                        onClick={() => reintentar()}
+                      >
+                        Reintentar
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="fill"
+                      color="primary"
+                      size="sm"
+                      type="button"
+                      disabled={descargando}
+                      onClick={handleDownload}
+                    >
+                      <FileDownloadOutlinedIcon data-icon="inline-start" />
+                      Descargar archivo
+                    </Button>
+                  </div>
+                ) : null}
               </>
             )}
           </div>
