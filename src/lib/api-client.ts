@@ -276,6 +276,13 @@ export function isNotFoundError(error: unknown): boolean {
   return Axios.isAxiosError(error) && error.response?.status === 404
 }
 
+// Un 403 que sobrevivió a la revalidación de sesión del interceptor (si el
+// refresh hubiera fallado, ya se estaría redirigiendo al login): el backend
+// confirma que esta sesión, válida, no tiene permiso para el recurso.
+export function isForbiddenError(error: unknown): boolean {
+  return Axios.isAxiosError(error) && error.response?.status === 403
+}
+
 // 409: el recurso está en un estado que no admite la operación (p. ej.
 // reenviar la activación de una cuenta que ya está activa).
 export function isConflictError(error: unknown): boolean {
