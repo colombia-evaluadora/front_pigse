@@ -99,14 +99,15 @@ export interface Document {
   establishmentName?: string | null
   /**
    * V521: los 4 tipos (antes solo PEI/PEC) cuelgan de anexos por categoría,
-   * nunca de un archivo propio — `fileName`/`archivoId`/`downloadUrl` de
-   * esta fila quedan siempre `null`; el archivo real vive en cada anexo
+   * nunca de un archivo propio — en PEI/PEC `fileName`/`archivoId`/
+   * `downloadUrl` de esta fila quedan `null`; en PMI/PFI traen el archivo
+   * del plan (lo usa el tablero de monitoreo). El detalle vive en cada anexo
    * (`DocumentCategory`, ver `fn_documento_categorias_listar`). `status`
    * sigue siendo la fuente de verdad de "completo": COMPLETO exige
    * `completedCategories === totalCategories` (ya lo calcula el backend,
    * el front no lo reinventa). PEI/PEC: 4 de sus 5 categorías cuentan acá
    * ("Plan escolar de gestión del riesgo" es opcional, ver
-   * `DOCUMENT_CATEGORIES_BY_TYPE`); PMI/PFI: 1 sola categoría.
+   * `DOCUMENT_CATEGORIES_BY_TYPE`); PMI/PFI: el plan y su autoevaluación.
    */
   completedCategories?: number | null
   totalCategories?: number | null
@@ -124,16 +125,26 @@ const PEI_PEC_CATEGORIES = [
   "PLAN_GESTION_RIESGO",
 ] as const
 
-/** La única categoría de un PMI/PFI (V521): "Autoevaluación institucional". */
-const PMI_PFI_CATEGORIES = ["AUTOEVALUACION_INSTITUCIONAL"] as const
+/** PMI/PFI (V521): el plan propiamente dicho y su anexo obligatorio de
+ *  autoevaluación. Antes había un solo hueco (la autoevaluación) y las
+ *  escuelas subían ahí el plan; V554 reetiquetó esas cargas como plan. */
+const PMI_CATEGORIES = ["PLAN_MEJORAMIENTO", "AUTOEVALUACION_INSTITUCIONAL"] as const
+const PFI_CATEGORIES = ["PLAN_FORTALECIMIENTO", "AUTOEVALUACION_INSTITUCIONAL"] as const
 
-export const DOCUMENT_CATEGORIES = [...PEI_PEC_CATEGORIES, ...PMI_PFI_CATEGORIES] as const
+export const DOCUMENT_CATEGORIES = [
+  ...PEI_PEC_CATEGORIES,
+  "PLAN_MEJORAMIENTO",
+  "PLAN_FORTALECIMIENTO",
+  "AUTOEVALUACION_INSTITUCIONAL",
+] as const
 export type DocumentCategoryCode = (typeof DOCUMENT_CATEGORIES)[number]
 
 /** Qué categorías le corresponden a cada tipo — PEI/PEC comparten las 5 de
- *  siempre, PMI/PFI solo tienen "Autoevaluación institucional" (V521). */
+ *  siempre, PMI/PFI tienen su plan + "Autoevaluación institucional". */
 export function documentCategoriesForType(type: DocumentType): readonly DocumentCategoryCode[] {
-  return type === "PMI" || type === "PFI" ? PMI_PFI_CATEGORIES : PEI_PEC_CATEGORIES
+  if (type === "PMI") return PMI_CATEGORIES
+  if (type === "PFI") return PFI_CATEGORIES
+  return PEI_PEC_CATEGORIES
 }
 
 /**
@@ -161,8 +172,12 @@ export function documentCategoryDisplayName(categoria: DocumentCategoryCode): st
       // (V521) — se repite acá para que el mock (sin backend real detrás)
       // muestre lo mismo.
       return "Plan escolar de gestión del riesgo (opcional)"
+    case "PLAN_MEJORAMIENTO":
+      return "Plan de Mejoramiento Institucional"
+    case "PLAN_FORTALECIMIENTO":
+      return "Plan de Fortalecimiento Institucional"
     case "AUTOEVALUACION_INSTITUCIONAL":
-      return "Autoevaluación institucional"
+      return "Autoevaluación institucional (anexo)"
   }
 }
 

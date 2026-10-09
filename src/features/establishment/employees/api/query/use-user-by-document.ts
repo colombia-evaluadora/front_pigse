@@ -40,17 +40,13 @@ function toGenderCatalogItem(id: number | null, name: string | null): CatalogIte
  * alta de funcionario): busca un TUSUARIO existente por (tipo de documento,
  * identificación) y devuelve un patch para volcar sobre `Person` — todo
  * menos `documentType`/`identification` (esos ya los escribió el usuario
- * para poder buscar) ni `password` (nunca viaja de vuelta, ni existe en
- * TUSUARIO).
+ * para poder buscar).
  *
- * REV: el patch trae `accountExists: true` — es la señal que usa
- * `UserDetailsForm` para bloquear el campo de contraseña (con puntitos, sin
- * poder tocarlo) en vez de seguir pidiéndola como si la persona fuera
- * nueva. Antes esto no se distinguía de un alta genuina, así que el form
- * exigía una contraseña igual, aunque el backend (`FuncionarioRegistration
- * Service`, REV V71) ya reconoce y reutiliza la cuenta existente por
- * documento/correo sin necesitar ninguna contraseña nueva — el usuario
- * queda ligado siendo el mismo, no se le cambia el login.
+ * REV: el patch trae `accountExists: true` — la persona ya tiene cuenta y
+ * el backend (`FuncionarioRegistrationService`, REV V71) la reconoce y
+ * reutiliza por documento/correo: el usuario queda ligado siendo el mismo,
+ * no se le cambia el login. (El alta ya no pide contraseña en ningún caso:
+ * las cuentas nuevas se activan desde el correo de invitación.)
  *
  * `fn_fun_crear` (SQL) reusa el TUSUARIO por documento (o por correo) y
  * solo crea el TFUNCIONARIO nuevo, así que ya no hace falta preocuparse

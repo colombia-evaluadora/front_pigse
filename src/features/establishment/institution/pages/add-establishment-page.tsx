@@ -23,7 +23,7 @@ import {
 import { paths } from "@/config/paths"
 import { env } from "@/config/env"
 import { SUCCESS_MESSAGES } from "@/lib/success-messages"
-import { getErrorMessage } from "@/lib/api-client"
+import { getErrorMessage, isConflictError } from "@/lib/api-client"
 import { EstablishmentDetailsForm } from "@/features/establishment/institution/components/forms/form-establishment"
 import { ComplementaryDataFormSection } from "@/features/establishment/institution/components/forms/form-sections/complementary-data-section"
 import { useCreateWithPerson } from "@/features/establishment/employees/api/mutations/use-create-with-person"
@@ -31,6 +31,7 @@ import {
   cancelarFuncionarioPendiente,
   registerFuncionario,
 } from "@/features/establishment/employees/api/mutations/use-register-funcionario"
+import { reenviarActivacion } from "@/features/establishment/employees/api/mutations/use-reenviar-activacion"
 import { update as updateFuncionario } from "@/features/establishment/employees/api/mutations/update"
 import {
   correoCambio,
@@ -98,7 +99,6 @@ function createEmptyPerson(): Person {
     gender: null,
     email: "",
     phone: "",
-    password: "",
   }
 }
 
@@ -160,7 +160,7 @@ export function AddEstablishmentPage() {
   const [formValues, setFormValues] = useState<EstablishmentDetails>(
     createInitialEstablishmentValues,
   )
-  // Mensaje por campo, indexado por ruta (`basicInfo.name`, `principal.password`, …).
+  // Mensaje por campo, indexado por ruta (`basicInfo.name`, `principal.email`, …).
   // Escudo elegido en el dropzone. Vive acá y no en la sección del formulario
   // porque es esta página la que guarda: se manda como el archivo `logo` del
   // multipart, aparte del JSON. `null` = no se eligió ninguno, y en edición
@@ -169,11 +169,6 @@ export function AddEstablishmentPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [invalidFields, setInvalidFields] = useState<string[]>([])
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  // Confirmaciones de contraseña: estado de UI, no parte del modelo de negocio.
-  const [confirmPasswords, setConfirmPasswords] = useState<Record<string, string>>({
-    principal: "",
-    secretary: "",
-  })
   // Mismo criterio que `shield`, pero por persona: la foto de rector y
   // secretaria se manda como `fkTarchivoFoto` del multipart de SU propio
   // registro/actualización de funcionario, no del establecimiento.
@@ -209,7 +204,6 @@ export function AddEstablishmentPage() {
       setFieldErrors({})
       setInvalidFields([])
       setHasSubmitted(false)
-      setConfirmPasswords({ principal: "", secretary: "" })
       setPrincipalEmployee(null)
       setSecretaryEmployee(null)
       principalMatchRef.current = null
@@ -223,10 +217,6 @@ export function AddEstablishmentPage() {
       setFieldErrors({})
       setInvalidFields([])
       setHasSubmitted(false)
-      setConfirmPasswords({
-        principal: existing.principal?.password ?? "",
-        secretary: existing.secretary?.password ?? "",
-      })
       setPrincipalEmployee(establishmentQuery.data.principalEmployee)
       setSecretaryEmployee(establishmentQuery.data.secretaryEmployee)
       principalMatchRef.current = null
@@ -236,15 +226,15 @@ export function AddEstablishmentPage() {
 
   useEffect(() => {
     if (!hasSubmitted) return
-    const validation = validateEstablishmentForm(formValues, confirmPasswords, {
+    const validation = validateEstablishmentForm(formValues, {
       logo: shield,
       photos,
     })
     setFieldErrors(validation.fieldErrors)
     setInvalidFields(validation.invalidFields)
-  }, [formValues, confirmPasswords, shield, photos, hasSubmitted])
+  }, [formValues, shield, photos, hasSubmitted])
 
-  // Sin `onSuccess` acá: en real hay que enlazar rector/secretaria (si se
+  // Sin `onSuccess` acá: en real hay que invitar a rector/secretaria (si se
   // registraron de nuevo) DESPUÉS de crear el establecimiento y ANTES de
   // navegar — `handleSubmit` orquesta todo eso a mano tras `mutateAsync`.
   const createMutation = useCreate({
@@ -260,26 +250,60 @@ export function AddEstablishmentPage() {
   const queryClient = useQueryClient()
   // Avisos de "correo de activación enviado" de rector/secretaria (ver
   // persistPersonIfAny); se muestran junto al mensaje de éxito del EE.
+  // `activationFailedRef`: falló la reactivación por cambio de correo (error).
+  // `invitationWarningRef`: el alta quedó hecha pero la invitación no salió
+  // (warning — se puede reenviar desde la tabla de funcionarios).
   const activationNoticesRef = useRef<string[]>([])
   const activationFailedRef = useRef(false)
+  const invitationWarningRef = useRef(false)
 
+  function takeActivationNotices() {
+    const avisos = activationNoticesRef.current
+    const variant: "error" | "warning" | undefined = activationFailedRef.current
+      ? "error"
+      : invitationWarningRef.current
+        ? "warning"
+        : undefined
+    activationNoticesRef.current = []
+    activationFailedRef.current = false
+    invitationWarningRef.current = false
+    return { avisos, variant }
+  }
+
+  /**
+   * Manda la invitación ("Activa tu cuenta") a rector/secretaria registrados
+   * en este submit — SOLO después de que el establecimiento se guardó. Se
+   * registraron con `enviarInvitacion: false` (ver `persistPersonIfAny`):
+   * si el EE falla, `cancelarPendientesRegistrados` los deshace y nadie
+   * recibe un correo de una cuenta que no quedó asignada.
+   *
+   * El alta no dice si la cuenta quedó pendiente o si se reusó una ya activa
+   * (ambos casos: `invitacionEnviada: false`, `mensajeInvitacion: null`), así
+   * que se intenta siempre: un 409 ("La cuenta ya está activa") significa que
+   * la persona ya puede iniciar sesión y no hay nada que avisar. Un fallo no
+   * deshace nada (el EE ya está guardado): se avisa como `warning` y se puede
+   * reenviar desde Funcionarios.
+   */
+  async function enviarInvitacionesPendientes(pendientes: PendingInvitation[]) {
+    for (const { label, correo } of pendientes) {
+      try {
+        await reenviarActivacion({ correo })
+        activationNoticesRef.current.push(`${label}: se envió el correo de activación a ${correo}.`)
+      } catch (error) {
+        if (isConflictError(error)) continue
+        activationNoticesRef.current.push(
+          `${label}: no fue posible enviar el correo de activación; usa «Reenviar activación» en Funcionarios.`,
+        )
+        invitationWarningRef.current = true
+      }
+    }
+  }
+
+  // Sin `onSuccess` acá: el aviso de éxito y la navegación los hace
+  // `handleSubmit`, porque antes tiene que mandar las invitaciones de
+  // rector/secretaria (`enviarInvitacionesPendientes`) y esperar su resultado.
   const updateMutation = useUpdate({
     mutationConfig: {
-      onSuccess: (result) => {
-        if (result.status === "error") {
-          notify(result.message, { variant: "error" })
-          return
-        }
-        const avisos = activationNoticesRef.current
-        activationNoticesRef.current = []
-        const fallo = activationFailedRef.current
-        activationFailedRef.current = false
-        notify(
-          [SUCCESS_MESSAGES.establishment.updated, ...avisos].join(" "),
-          fallo ? { variant: "error" } : undefined,
-        )
-        navigate({ to: paths.app.establishments.general.getHref() })
-      },
       onError: (error) => {
         notify(getErrorMessage(error) || "No se pudo actualizar el establecimiento.", {
           variant: "error",
@@ -294,7 +318,7 @@ export function AddEstablishmentPage() {
    * Devuelve true si la persona ya trae al menos un dato capturado (la
    * consideramos "presente" y por tanto debe persistirse).
    */
-  function personHasAnyData(person: Person | null, confirmPassword: string): boolean {
+  function personHasAnyData(person: Person | null): boolean {
     if (!person) {
       return false
     }
@@ -309,9 +333,7 @@ export function AddEstablishmentPage() {
       person.birthDate.trim() ||
       person.gender?.id ||
       person.email.trim() ||
-      person.phone.trim() ||
-      person.password.trim() ||
-      confirmPassword.trim(),
+      person.phone.trim(),
     )
   }
 
@@ -327,6 +349,18 @@ export function AddEstablishmentPage() {
      * (`updateFuncionario`) — ya está en uso, cancelarla sería un error.
      */
     pkFuncionarioRegistrado: number | null
+    /**
+     * Correo al que hay que mandar la invitación cuando el establecimiento
+     * se guarde (ver `enviarInvitacionesPendientes`). Solo en el alta real
+     * de una persona nueva; `null` si no hay nada que invitar (persona ya
+     * existente, mock, o el backend ya explicó por qué no — `mensajeInvitacion`).
+     */
+    pendingInvitation: PendingInvitation | null
+  }
+
+  interface PendingInvitation {
+    label: string
+    correo: string
   }
 
   /**
@@ -370,14 +404,13 @@ export function AddEstablishmentPage() {
     person: Person | null,
     existingEmployee: Employee | null,
     label: string,
-    confirmPassword: string,
     /** Foto recién elegida; `null` en edición = conservar la guardada. */
     foto: File | null,
     /** Ver el párrafo de `matchSnapshot` arriba. `null` si no hubo match, o
      * si el match ya traía `id` (esa rama no la necesita). */
     matchSnapshot: Partial<Person> | null,
   ): Promise<PersistedPerson | null> {
-    if (!person || !personHasAnyData(person, confirmPassword)) {
+    if (!person || !personHasAnyData(person)) {
       return null
     }
 
@@ -427,11 +460,28 @@ export function AddEstablishmentPage() {
           // muestran a esta persona y quedarían viejos sin invalidar.
           void queryClient.invalidateQueries({ queryKey: ["employees"] })
           notify(`${label} actualizado.`)
-          return { person, pkFuncionarioRegistrado: null }
+          return { person, pkFuncionarioRegistrado: null, pendingInvitation: null }
         }
 
-        const registered = await registerFuncionario(person, foto)
+        // `enviarInvitacion: false`: el correo de activación sale recién
+        // cuando el establecimiento se guardó (`enviarInvitacionesPendientes`).
+        // Si el EE falla, este registro se cancela y no se invita a nadie.
+        const registered = await registerFuncionario(person, foto, { enviarInvitacion: false })
         const persistedPerson = { ...person, id: registered.pkFuncionario }
+
+        // `mensajeInvitacion` no nulo: el backend ya sabe que no se puede
+        // invitar (p. ej. cuenta de baja) — se muestra su motivo y no se
+        // intenta el reenvío. Si no, queda pendiente para después del EE.
+        let pendingInvitation: PendingInvitation | null = null
+        if (registered.mensajeInvitacion != null) {
+          activationNoticesRef.current.push(`${label}: ${registered.mensajeInvitacion}`)
+          invitationWarningRef.current = true
+        } else {
+          pendingInvitation = {
+            label,
+            correo: registered.email || toEmailInput(person.email),
+          }
+        }
 
         // Ver "matchSnapshot" en el comentario de arriba: `fn_fun_crear`
         // reusó el TUSUARIO tal cual estaba, así que cualquier corrección
@@ -448,6 +498,7 @@ export function AddEstablishmentPage() {
         return {
           person: persistedPerson,
           pkFuncionarioRegistrado: registered.pkFuncionario,
+          pendingInvitation,
         }
       } catch (error) {
         notify(getErrorMessage(error), {
@@ -465,16 +516,33 @@ export function AddEstablishmentPage() {
     }
 
     notify(`${label} guardado.`)
-    return { person: result.person, pkFuncionarioRegistrado: null }
+    return { person: result.person, pkFuncionarioRegistrado: null, pendingInvitation: null }
   }
+
+  // Cubre TODO el guardado (registro de rector/secretaria → EE →
+  // invitaciones), no solo la mutación del EE: con solo `isPending`, el botón
+  // quedaba habilitado mientras se registraban las personas o se mandaban las
+  // invitaciones, y un doble clic podía registrar dos veces.
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      await submit()
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function submit() {
     activationNoticesRef.current = []
     activationFailedRef.current = false
+    invitationWarningRef.current = false
     setHasSubmitted(true)
 
-    const validation = validateEstablishmentForm(formValues, confirmPasswords, {
+    const validation = validateEstablishmentForm(formValues, {
       logo: shield,
       photos,
     })
@@ -493,6 +561,7 @@ export function AddEstablishmentPage() {
     // el mismo paso y no hay nada que enlazar después).
     let nextPrincipal = formValues.principal
     let nextSecretary = formValues.secretary
+    const pendingInvitations: PendingInvitation[] = []
     let principalPkFuncionario: number | null = null
     let secretaryPkFuncionario: number | null = null
 
@@ -501,26 +570,26 @@ export function AddEstablishmentPage() {
         nextPrincipal,
         principalEmployee,
         "Rector",
-        confirmPasswords["principal"] ?? "",
         photos["principal"] ?? null,
         principalMatchRef.current,
       )
       if (persistedPrincipal) {
         nextPrincipal = persistedPrincipal.person
         principalPkFuncionario = persistedPrincipal.pkFuncionarioRegistrado
+        if (persistedPrincipal.pendingInvitation) pendingInvitations.push(persistedPrincipal.pendingInvitation)
       }
 
       const persistedSecretary = await persistPersonIfAny(
         nextSecretary,
         secretaryEmployee,
         "Secretaria",
-        confirmPasswords["secretary"] ?? "",
         photos["secretary"] ?? null,
         secretaryMatchRef.current,
       )
       if (persistedSecretary) {
         nextSecretary = persistedSecretary.person
         secretaryPkFuncionario = persistedSecretary.pkFuncionarioRegistrado
+        if (persistedSecretary.pendingInvitation) pendingInvitations.push(persistedSecretary.pendingInvitation)
       }
     } catch {
       return
@@ -577,11 +646,23 @@ export function AddEstablishmentPage() {
           logo: shield,
         })
         if (result.status === "error") {
+          notify(result.message, { variant: "error" })
           await cancelarPendientesRegistrados()
+          return
         }
       } catch {
+        // El `onError` de `updateMutation` ya avisó el motivo.
         await cancelarPendientesRegistrados()
+        return
       }
+
+      await enviarInvitacionesPendientes(pendingInvitations)
+      const { avisos, variant } = takeActivationNotices()
+      notify(
+        [SUCCESS_MESSAGES.establishment.updated, ...avisos].join(" "),
+        variant ? { variant } : undefined,
+      )
+      navigate({ to: paths.app.establishments.general.getHref() })
       return
     }
 
@@ -603,11 +684,16 @@ export function AddEstablishmentPage() {
       return
     }
 
-    notify(SUCCESS_MESSAGES.establishment.created)
+    await enviarInvitacionesPendientes(pendingInvitations)
+    const { avisos, variant } = takeActivationNotices()
+    notify(
+      [SUCCESS_MESSAGES.establishment.created, ...avisos].join(" "),
+      variant ? { variant } : undefined,
+    )
     navigate({ to: paths.app.establishments.general.getHref() })
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending
+  const isPending = isSubmitting || createMutation.isPending || updateMutation.isPending
 
   return (
     /*
@@ -713,10 +799,6 @@ export function AddEstablishmentPage() {
                         invalidFields={invalidFields}
                         errors={fieldErrors}
                         showValidation={hasSubmitted}
-                        confirmPassword={confirmPasswords["principal"] ?? ""}
-                        onConfirmPasswordChange={(value) =>
-                          setConfirmPasswords((current) => ({ ...current, principal: value }))
-                        }
                         photo={photos["principal"] ?? null}
                         onPhotoChange={(file) =>
                           setPhotos((current) => ({ ...current, principal: file }))
@@ -744,10 +826,6 @@ export function AddEstablishmentPage() {
                         errors={fieldErrors}
                         showValidation={hasSubmitted}
                         required={false}
-                        confirmPassword={confirmPasswords["secretary"] ?? ""}
-                        onConfirmPasswordChange={(value) =>
-                          setConfirmPasswords((current) => ({ ...current, secretary: value }))
-                        }
                         photo={photos["secretary"] ?? null}
                         onPhotoChange={(file) =>
                           setPhotos((current) => ({ ...current, secretary: file }))
