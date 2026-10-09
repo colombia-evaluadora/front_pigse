@@ -85,18 +85,28 @@ export function PdfViewerPage() {
   // Ver el javadoc de `visorSearchSchema`: al visor se llega desde Gestión
   // documental (EE propio) y desde Monitoreo (cualquier EE), y los roles
   // territoriales del segundo caso no tienen permiso sobre `/documentos`.
-  const { archivoId, downloadUrl } = search
+  const { archivoId } = search
+  // Con `archivoId` alcanza para descargar: si la fila no trajo `downloadUrl`
+  // se arma con el mismo formato que usa el backend.
+  const downloadUrl =
+    search.downloadUrl ?? (archivoId != null ? `/api/files/download/${archivoId}` : undefined)
+  // PMI/PFI suelen cargarse en Word: pdf.js solo abre PDF, así que el resto
+  // ni se baja para previsualizar (se ofrece solo la descarga).
+  const esPdf = !search.fileName || /\.pdf$/i.test(search.fileName)
   // El binario se baja con el cliente autenticado y se le pasa a pdf.js como
   // Blob. Si el usuario pasó el cursor por la fila antes de entrar, ya está
   // cacheado (ver el prefetch del popover) y la pantalla abre instantánea.
-  const { data: archivo, isPending: archivoPending } = useArchivoBlob(archivoId, downloadUrl)
+  const { data: archivo, isPending: archivoPending } = useArchivoBlob(
+    esPdf ? archivoId : undefined,
+    downloadUrl,
+  )
 
   // En React Query v5 una query DESHABILITADA reporta `isPending`, no `idle`.
   // Si se mirara `archivoPending` a secas, un documento sin archivo (donde el
   // hook queda deshabilitado por `archivoId == null`) mostraría el spinner
   // para siempre en vez del mensaje de "todavía no hay archivo". Por eso el
   // spinner exige que EXISTA algo que cargar.
-  const cargando = archivoId != null && archivoPending
+  const cargando = esPdf && archivoId != null && archivoPending
 
   const [descargando, setDescargando] = useState(false)
   const { notify } = useNotify()
@@ -155,7 +165,7 @@ export function PdfViewerPage() {
                 variant="fill"
                 color="primary"
                 type="button"
-                disabled={!downloadUrl || descargando}
+                disabled={archivoId == null || descargando}
                 onClick={handleDownload}
               >
                 {descargando ? (
@@ -216,7 +226,9 @@ export function PdfViewerPage() {
                 <p className="m-0! max-w-md text-center text-sm text-muted-foreground">
                   {archivoId == null
                     ? "Este documento todavía no tiene un archivo cargado."
-                    : "No se pudo abrir el documento. Volvé a intentar desde el listado."}
+                    : !esPdf
+                      ? "Vista previa no disponible. Descarga el archivo para verlo."
+                      : "No se pudo abrir el documento. Volvé a intentar desde el listado."}
                 </p>
               </>
             )}
