@@ -1,18 +1,14 @@
 import { useEffect, useState } from "react"
 
+import { formatRemaining } from "@/features/auth/utils/format-duration"
+
 export interface Countdown {
   /** Segundos restantes. `null` mientras no se sepa. */
   seconds: number | null
-  /** Listo para pintar: "9:07". `null` si no hay cuenta corriendo. */
+  /** Listo para pintar: "9:07", "1 h 30 min", "6 días y 23 h". `null` si no hay cuenta corriendo. */
   label: string | null
   /** `true` solo cuando la cuenta llegó a cero (no cuando aún se desconoce). */
   hasElapsed: boolean
-}
-
-function format(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${String(secs).padStart(2, "0")}`
 }
 
 /**
@@ -41,7 +37,7 @@ export function useCountdown(expiresIn: number | undefined): Countdown {
 
   return {
     seconds,
-    label: seconds === null ? null : format(seconds),
+    label: seconds === null ? null : formatRemaining(seconds),
     hasElapsed: seconds === 0,
   }
 }
