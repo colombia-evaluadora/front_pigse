@@ -72,6 +72,14 @@ export const ROUTE_MENU_OWNERS: readonly RouteMenuOwner[] = [
     path: "/app/visor",
     menus: ["/app/gestion-documental", "/app/monitoreo-cumplimiento"],
   },
+  // Fecha límite de Gestión documental (V522): no tiene ítem de menú propio.
+  // Decisión de producto: la abre quien tenga Gestión documental o Monitoreo
+  // y cumplimiento (Secretaria Territorial administra el plazo desde
+  // Monitoreo; las escrituras igual las filtra el backend por rol).
+  {
+    path: "/app/administracion/gestion-documental/fecha-limite",
+    menus: ["/app/gestion-documental", "/app/monitoreo-cumplimiento"],
+  },
 ]
 
 /**

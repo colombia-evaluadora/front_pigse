@@ -56,9 +56,8 @@ const RUTAS: Array<[ruta: string, duenos: string[] | null]> = [
   [paths.app.gestionDocumentalDetalle.getHref("PEI"), [GESTION_DOCUMENTAL]],
   [paths.app.monitoreoCumplimiento.getHref(), [MONITOREO]],
   [paths.app.visor.getHref("PEI"), [GESTION_DOCUMENTAL, MONITOREO]],
-  // Sin menú sembrado en la BD (V522 no lo agrega): solo entra quien tenga
-  // un ítem de menú con esta URL exacta, asignado desde "Roles y menús".
-  [paths.app.gestionDocumentalFechaLimite.getHref(), null],
+  // Sin ítem de menú propio (V522): la abren Gestión documental o Monitoreo.
+  [paths.app.gestionDocumentalFechaLimite.getHref(), [GESTION_DOCUMENTAL, MONITOREO]],
 ]
 
 describe("canAccessPath — tabla de rutas", () => {
@@ -73,7 +72,7 @@ describe("canAccessPath — tabla de rutas", () => {
     expect(canAccessPath(ruta, menuOf(...otros))).toBe(false)
   })
 
-  it("una ruta sin dueño entra si el usuario tiene un menú con esa URL exacta", () => {
+  it("una ruta con dueños igual entra si el usuario tiene un menú con esa URL exacta", () => {
     const fechaLimite = paths.app.gestionDocumentalFechaLimite.getHref()
     expect(canAccessPath(fechaLimite, menuOf(fechaLimite))).toBe(true)
   })
