@@ -40,7 +40,7 @@ export interface RegisterFuncionarioResult {
   pkTusuario: number
   pkFuncionario: number
   email: string
-/**
+  /**
    * El alta ya no lleva `password`: el backend crea la cuenta pendiente de
    * activación y manda al correo el enlace "Activa tu cuenta" (7 días).
    * `invitacionEnviada`: se envió ese correo. `mensajeInvitacion`: no nulo
@@ -52,7 +52,20 @@ export interface RegisterFuncionarioResult {
   mensajeInvitacion?: string | null
 }
 
-function toRegisterFuncionarioRequest(person: Person) {
+export interface RegisterFuncionarioOptions {
+  /**
+   * `false` = el backend crea la cuenta pendiente de activación pero NO manda
+   * todavía el correo "Activa tu cuenta" (sso PR #634; omitido = `true`).
+   * Lo usa `add-establishment-page.tsx`: registra a rector/secretaria ANTES
+   * de crear el establecimiento y, si ese paso falla, los cancela — con la
+   * invitación ya enviada, la persona recibía el correo de una cuenta que no
+   * quedó asignada a nada. Ahí la invitación sale recién después, con
+   * `reenviarActivacion`, cuando el establecimiento ya se guardó.
+   */
+  enviarInvitacion?: boolean
+}
+
+function toRegisterFuncionarioRequest(person: Person, { enviarInvitacion }: RegisterFuncionarioOptions) {
   const fullName = [person.firstName, person.middleName, person.lastName, person.secondLastName]
     .filter(Boolean)
     .join(" ")
@@ -73,6 +86,9 @@ function toRegisterFuncionarioRequest(person: Person) {
     // El front solo tiene un campo de correo; se manda igual como cuenta
     // (login) y como dato de contacto de TUSUARIO.
     correoElectronico: person.email || undefined,
+    // Solo viaja cuando se pide explícitamente no invitar: omitido, el
+    // backend asume `true` (el diálogo de funcionarios no cambia).
+    ...(enviarInvitacion === false ? { enviarInvitacion: false } : {}),
   }
 }
 
@@ -91,8 +107,9 @@ function toRegisterFuncionarioRequest(person: Person) {
 export async function registerFuncionario(
   person: Person,
   foto?: File | null,
+  options: RegisterFuncionarioOptions = {},
 ): Promise<RegisterFuncionarioResult> {
-  const body = toRegisterFuncionarioRequest(person)
+  const body = toRegisterFuncionarioRequest(person, options)
 
   if (foto) {
     return postMultipart<RegisterFuncionarioResult>("/register/pigse/funcionario", body, {
