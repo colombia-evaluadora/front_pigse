@@ -1,5 +1,6 @@
 import { useResetTokenStatusQuery } from "@/features/auth/api/query/use-reset-token-status-query"
 import { useCountdown } from "@/features/auth/hooks/use-countdown"
+import { formatTtl } from "@/features/auth/utils/format-duration"
 
 export interface PasswordResetLink {
   /** Todavía no se sabe nada del enlace. */
@@ -14,17 +15,10 @@ export interface PasswordResetLink {
   maskedEmail: string | null
   /** Hora a la que salió el correo, lista para pintar ("14:32"). */
   issuedAtLabel: string | null
-  /** Tiempo que le queda, listo para pintar ("9:07"). */
+  /** Tiempo que le queda, listo para pintar ("9:07", "1 día y 23 h"). */
   remainingLabel: string | null
-  /** Vida total del enlace, lista para pintar ("30 minutos"). */
+  /** Vida total del enlace, lista para pintar ("2 días"). */
   ttlLabel: string | null
-}
-
-/** 1800 -> "30 minutos"; 45 -> "45 segundos". */
-function formatTtl(seconds: number): string {
-  if (seconds < 60) return `${seconds} segundos`
-  const mins = Math.round(seconds / 60)
-  return `${mins} ${mins === 1 ? "minuto" : "minutos"}`
 }
 
 /** "14:32" — la hora a la que salió el correo. */
