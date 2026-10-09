@@ -46,7 +46,7 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
   const isReadOnly = !canWriteDocuments(userQuery.data)
 
   // "Plan de estudios" (V515) es EXCLUSIVA de PEI/PEC -- PMI/PFI solo
-  // tienen "Autoevaluación institucional" (V521), que sigue el patrón de
+  // tienen su plan + "Autoevaluación institucional" (V521), que siguen el patrón de
   // un archivo por categoría (Subir/Eliminar resuelve en
   // `columns-document-categories.tsx`, no acá).
   const tienePlanEstudios = type === "PEI" || type === "PEC"
