@@ -13,7 +13,7 @@ export interface Notice {
   message: string
 }
 
-export type NoticeVariant = "info" | "success" | "error"
+export type NoticeVariant = "info" | "success" | "warning" | "error"
 
 /**
  * Fondo `X-22` alineado con la variante soft del Badge: misma familia de color
@@ -31,6 +31,9 @@ export type NoticeVariant = "info" | "success" | "error"
 const VARIANT_CLASSES: Record<NoticeVariant, string> = {
   info: "border-transparent bg-primary-22 text-primary",
   success: "border-transparent bg-green-22 text-foreground",
+  // `warning`: la acción salió bien pero algo secundario no (p. ej. el
+  // funcionario se creó pero no se pudo enviar el correo de activación).
+  warning: "border-transparent bg-yellow-22 text-foreground",
   error: "border-transparent bg-red-22 text-foreground",
 }
 
@@ -38,6 +41,7 @@ const VARIANT_CLASSES: Record<NoticeVariant, string> = {
 const VARIANT_ICON_CLASSES: Record<NoticeVariant, string> = {
   info: "text-primary",
   success: "text-green",
+  warning: "text-yellow",
   error: "text-red",
 }
 
@@ -50,6 +54,7 @@ const VARIANT_ICON_CLASSES: Record<NoticeVariant, string> = {
 const VARIANT_ICON: Record<NoticeVariant, typeof InfoIcon> = {
   info: InfoIcon,
   success: InfoIcon,
+  warning: WarningCircleIcon,
   error: WarningCircleIcon,
 }
 

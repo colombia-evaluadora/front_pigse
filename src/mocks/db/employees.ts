@@ -45,7 +45,6 @@ function createPerson(): Person {
     gender: createCatalogItem(GENDERS),
     email: faker.internet.email({ firstName, lastName }),
     phone: faker.phone.number({ style: "international" }),
-    password: faker.internet.password({ length: 12 }),
   }
 }
 

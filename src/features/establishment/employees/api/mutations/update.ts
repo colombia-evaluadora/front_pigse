@@ -21,9 +21,8 @@ import type { Employee } from "@/features/establishment/employees/api/types/empl
  * ("información complementaria", V390) SÍ viajan, con los mismos nombres
  * squasheados en camelCase que el resto de los binds.
  *
- * `password`/`birthDate`/`gender`/foto de perfil NO viajan por acá: esta
- * query no los declara (la contraseña la fija el propio usuario, no un
- * admin; género/nacimiento/foto son de `pigse.TUSUARIO` y no tienen
+ * `birthDate`/`gender`/foto de perfil NO viajan por acá: esta query no
+ * los declara (género/nacimiento/foto son de `pigse.TUSUARIO` y no tienen
  * endpoint de edición todavía — fuera de alcance).
  */
 function toRealBackendPayload(values: Employee) {

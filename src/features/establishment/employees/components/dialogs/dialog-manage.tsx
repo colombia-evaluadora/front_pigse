@@ -41,7 +41,7 @@ import {
 } from "@/components/table-sort-header"
 import { CATALOGS } from "@/lib/catalogs"
 import { toSelectItemsMap, toSelectOptions } from "@/lib/catalog-options"
-import { SUCCESS_MESSAGES } from "@/lib/success-messages"
+import { employeeInvitationNotice, SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { getErrorMessage } from "@/lib/api-client"
 import { optionalImageFile } from "@/lib/image-file"
 import { env } from "@/config/env"
@@ -79,12 +79,8 @@ import {
   type Permission,
   type PermissionStatus,
 } from "@/features/establishment/institution/api/types/permission"
-import { passwordRules } from "@/features/auth/api/schema"
 import { validarFormatoPersona } from "@/features/establishment/shared/person-field-rules"
-import {
-  PASSWORD_PLACEHOLDER,
-  UserDetailsForm,
-} from "@/features/establishment/employees/components/forms/form-sections/user-details-section"
+import { UserDetailsForm } from "@/features/establishment/employees/components/forms/form-sections/user-details-section"
 import { NoticeOutlet, useNotify } from "@/components/notice/notice-context"
 
 interface ManageEmployeeDialogProps {
@@ -113,7 +109,6 @@ function createEmptyPerson(): Person {
     gender: null,
     email: "",
     phone: "",
-    password: "",
   }
 }
 
@@ -123,41 +118,27 @@ function isBlankValue(value: string | null | undefined): boolean {
 
 /**
  * Datos mínimos para dar de alta a la persona: los cuatro con asterisco, más
- * correo, género y contraseña — no llevan asterisco en el formulario
- * (`UserDetailsForm` lo comparte con otras pantallas donde son opcionales),
- * pero acá son obligatorios de verdad: `/register/pigse/funcionario`
+ * correo y género — no llevan asterisco en el formulario (`UserDetailsForm`
+ * lo comparte con otras pantallas donde son opcionales), pero acá son
+ * obligatorios de verdad: `/register/pigse/funcionario`
  * (`RegisterUsuarioRequest`, auth-center) y `pigse.fn_fun_crear` (SQL) los
- * exigen — correo/contraseña son la cuenta y el login del funcionario, y
- * género nunca dejó de ser obligatorio en el backend real. Fecha de
- * nacimiento sigue sin validarse acá: es columna nullable de verdad.
+ * exigen — el correo es la cuenta del funcionario y a donde llega la
+ * invitación de activación, y género nunca dejó de ser obligatorio en el
+ * backend real. Fecha de nacimiento sigue sin validarse acá: es columna
+ * nullable de verdad.
  *
- * `person.accountExists` (autocompletado por documento, ver
- * `use-user-by-document.ts`): ya hay una cuenta real detrás de ese
- * documento — el backend la reconoce y reutiliza sin tocarle la
- * contraseña (`FuncionarioRegistrationService`, V71), así que acá tampoco
- * se exige (el campo queda bloqueado en el form).
+ * Sin contraseña: el alta ya no la pide. El backend crea la cuenta pendiente
+ * de activación y manda el enlace "Activa tu cuenta" (7 días) al correo,
+ * donde la persona define su contraseña.
  */
 const employeePersonSchema = z
   .object({
     person: z.custom<Person>(),
-    confirmPassword: z.string(),
   })
-  .superRefine(({ person, confirmPassword }, ctx) => {
+  .superRefine(({ person }, ctx) => {
     const require = (path: string, value: string | null | undefined, message: string) => {
       if (isBlankValue(value)) {
         ctx.addIssue({ code: "custom", path: [path], message })
-      }
-    }
-
-    const requirePasswordStrength = (value: string | null | undefined) => {
-      if (isBlankValue(value)) {
-        return
-      }
-
-      for (const rule of passwordRules) {
-        if (!rule.test(value as string)) {
-          ctx.addIssue({ code: "custom", path: ["password"], message: rule.message })
-        }
       }
     }
 
@@ -180,60 +161,16 @@ const employeePersonSchema = z
     validarFormatoPersona(person, ctx)
 
     // Persona SIN `id` todavía: va a `POST /register/pigse/funcionario`, que
-    // exige `@NotBlank` en email/password. Persona CON `id` va a PUT
-    // (tolera estos campos vacíos, nunca resetea la contraseña), así que
-    // acá solo se exigen al crear.
+    // exige `@NotBlank` en email. Persona CON `id` va a PUT (tolera estos
+    // campos vacíos), así que acá solo se exigen al crear.
     if (!person.id) {
       require("email", person.email, "Ingresa el correo electrónico.")
       require("gender", person.gender?.name, "Selecciona el género.")
-
-      if (!person.accountExists) {
-        require("password", person.password, "Ingresa la contraseña.")
-        require("confirmPassword", confirmPassword, "Repite la contraseña.")
-        requirePasswordStrength(person.password)
-
-        if (
-          !isBlankValue(person.password) &&
-          !isBlankValue(confirmPassword) &&
-          person.password !== confirmPassword
-        ) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["confirmPassword"],
-            message: "Las contraseñas no coinciden.",
-          })
-        }
-      }
-      return
-    }
-
-    if (person.accountExists) {
-      return
-    }
-
-    const hasPassword = !isBlankValue(person.password)
-    const hasConfirm = !isBlankValue(confirmPassword)
-
-    if (!hasPassword && !hasConfirm) {
-      return
-    }
-
-    require("password", person.password, "Ingresa la contraseña.")
-    require("confirmPassword", confirmPassword, "Repite la contraseña.")
-    requirePasswordStrength(person.password)
-
-    if (hasPassword && hasConfirm && person.password !== confirmPassword) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["confirmPassword"],
-        message: "Las contraseñas no coinciden.",
-      })
     }
   })
 
 function computePersonErrors(
   person: Person | null,
-  confirmPassword: string,
   // La foto es estado aparte (viaja como binario del multipart, no como JSON),
   // pero se valida en el mismo paso: es el último punto antes de armar el
   // envío, y sin esto un archivo fuera de regla llegaba entero al gateway.
@@ -251,7 +188,7 @@ function computePersonErrors(
     return nextErrors
   }
 
-  const parsed = employeePersonSchema.safeParse({ person, confirmPassword })
+  const parsed = employeePersonSchema.safeParse({ person })
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
       nextErrors[`${EMPLOYEE_FIELD_PREFIX}.${issue.path.join(".")}`] ??= issue.message
@@ -313,10 +250,8 @@ function createPermissionDraft(nextOrder = 1): PermissionDraft {
 /**
  * Huella serializable de TODO lo editable del diálogo principal, para poder
  * responder "¿hay algo sin guardar?" sin espejar cada campo en un estado
- * aparte. `password`/`accountExists` quedan fuera a propósito: al cargar un
- * funcionario existente la contraseña es el valor decorativo
- * `PASSWORD_PLACEHOLDER`, no un dato del backend, y compararla marcaría
- * cambios donde no los hay.
+ * aparte. `accountExists` queda fuera a propósito: es una bandera de UI que
+ * pone el autocompletado, no un dato editable.
  *
  * Igual que CEVAL desde V390: establecimiento y cargo ya NO se piden acá
  * (el establecimiento se deriva de la sede al asignar un permiso, y el
@@ -328,7 +263,7 @@ function buildDraftSnapshot(
   additionalInfo: EmployeeAdditionalInfoValue,
   permissions: Permission[],
 ): string {
-  const { password: _password, accountExists: _accountExists, ...personRest } = person
+  const { accountExists: _accountExists, ...personRest } = person
   return JSON.stringify({ person: personRest, additionalInfo, permissions })
 }
 
@@ -416,7 +351,6 @@ export function ManageEmployeeDialog({
   const [permissions, setPermissions] = useState<Permission[]>([])
 
   const [personErrors, setPersonErrors] = useState<Record<string, string>>({})
-  const [confirmPassword, setConfirmPassword] = useState("")
   const [photo, setPhoto] = useState<File | null>(null)
   const [matchedFuncionarioId, setMatchedFuncionarioId] = useState<number | null>(null)
 
@@ -472,19 +406,14 @@ export function ManageEmployeeDialog({
 
   useEffect(() => {
     if (Object.keys(personErrors).length === 0) return
-    setPersonErrors(computePersonErrors(person, confirmPassword, photo))
+    setPersonErrors(computePersonErrors(person, photo))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `personErrors` es guard, no dep.
-  }, [person, confirmPassword, photo])
+  }, [person, photo])
 
   function applyLoadedEmployee(employee: Employee) {
-    // El backend nunca devuelve la contraseña (`use-employee.ts` la manda
-    // como ""): al editar, el campo se muestra con el valor decorativo y
-    // bloqueado (`accountExists`) — así no se cambia por accidente la
-    // contraseña de una cuenta existente con solo abrir el diálogo.
     const loadedPerson: Person = {
       ...employee.person,
       accountExists: true,
-      password: PASSWORD_PLACEHOLDER,
     }
     const loadedAdditionalInfo = createAdditionalInfoFromEmployee(employee)
 
@@ -498,7 +427,6 @@ export function ManageEmployeeDialog({
     setPermissionDraft(createPermissionDraft(employee.permissions.length + 1))
     setPersonErrors({})
     setPermissionErrors({})
-    setConfirmPassword(PASSWORD_PLACEHOLDER)
     setPhoto(null)
     setPermissionsSaved(employee.permissions.length > 0)
     setAdditionalInfoSaved(hasAdditionalInfoData(loadedAdditionalInfo))
@@ -520,7 +448,6 @@ export function ManageEmployeeDialog({
       setPermissionDraft(createPermissionDraft())
       setPersonErrors({})
       setPermissionErrors({})
-      setConfirmPassword("")
       setPhoto(null)
       setCreatedEmployeeId(null)
       setMatchedFuncionarioId(null)
@@ -622,7 +549,7 @@ export function ManageEmployeeDialog({
       return
     }
 
-    const nextPersonErrors = computePersonErrors(draft, confirmPassword, photo)
+    const nextPersonErrors = computePersonErrors(draft, photo)
 
     if (Object.keys(nextPersonErrors).length > 0) {
       setPersonErrors(nextPersonErrors)
@@ -700,6 +627,9 @@ export function ManageEmployeeDialog({
     // --- Backend real ---
     try {
       let funcionarioId = activeEmployeeId
+      // Aviso de la invitación de activación del alta (ver
+      // `employeeInvitationNotice`); `null` si no hubo registro nuevo.
+      let invitation: ReturnType<typeof employeeInvitationNotice> | null = null
 
       if (!funcionarioId) {
         // 1) Cuenta + TFUNCIONARIO "pendiente" (sin establecimiento aún) —
@@ -707,6 +637,10 @@ export function ManageEmployeeDialog({
         let persistedPerson = draft
         if (!persistedPerson.id) {
           const registered = await registerFuncionario(persistedPerson, photo)
+          invitation = employeeInvitationNotice({
+            ...registered,
+            email: registered.email || toEmailInput(persistedPerson.email ?? ""),
+          })
           persistedPerson = { ...persistedPerson, id: registered.pkFuncionario }
           funcionarioId = registered.pkFuncionario
         } else {
@@ -760,6 +694,15 @@ export function ManageEmployeeDialog({
       cleanSnapshotRef.current = buildDraftSnapshot(draft, additionalInfo, permissions)
 
       if (!activeEmployeeId) {
+        if (invitation) {
+          notify(
+            permissions.length === 0
+              ? `${invitation.message} Puedes asignar permisos.`
+              : invitation.message,
+            { variant: invitation.variant },
+          )
+          return
+        }
         notify(
           permissions.length === 0
             ? "Funcionario guardado. Puedes asignar permisos."
@@ -1028,8 +971,6 @@ export function ManageEmployeeDialog({
             errors={personErrors}
             invalidFields={Object.keys(personErrors)}
             showValidation
-            confirmPassword={confirmPassword}
-            onConfirmPasswordChange={setConfirmPassword}
             photo={photo}
             onPhotoChange={setPhoto}
             // Borrar la foto YA guardada: el form limpia
