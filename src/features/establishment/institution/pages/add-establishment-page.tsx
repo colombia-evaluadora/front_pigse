@@ -22,7 +22,7 @@ import {
 
 import { paths } from "@/config/paths"
 import { env } from "@/config/env"
-import { SUCCESS_MESSAGES } from "@/lib/success-messages"
+import { employeeInvitationNotice, SUCCESS_MESSAGES } from "@/lib/success-messages"
 import { getErrorMessage } from "@/lib/api-client"
 import { EstablishmentDetailsForm } from "@/features/establishment/institution/components/forms/form-establishment"
 import { ComplementaryDataFormSection } from "@/features/establishment/institution/components/forms/form-sections/complementary-data-section"
@@ -98,7 +98,6 @@ function createEmptyPerson(): Person {
     gender: null,
     email: "",
     phone: "",
-    password: "",
   }
 }
 
@@ -160,7 +159,7 @@ export function AddEstablishmentPage() {
   const [formValues, setFormValues] = useState<EstablishmentDetails>(
     createInitialEstablishmentValues,
   )
-  // Mensaje por campo, indexado por ruta (`basicInfo.name`, `principal.password`, …).
+  // Mensaje por campo, indexado por ruta (`basicInfo.name`, `principal.email`, …).
   // Escudo elegido en el dropzone. Vive acá y no en la sección del formulario
   // porque es esta página la que guarda: se manda como el archivo `logo` del
   // multipart, aparte del JSON. `null` = no se eligió ninguno, y en edición
@@ -169,11 +168,6 @@ export function AddEstablishmentPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [invalidFields, setInvalidFields] = useState<string[]>([])
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  // Confirmaciones de contraseña: estado de UI, no parte del modelo de negocio.
-  const [confirmPasswords, setConfirmPasswords] = useState<Record<string, string>>({
-    principal: "",
-    secretary: "",
-  })
   // Mismo criterio que `shield`, pero por persona: la foto de rector y
   // secretaria se manda como `fkTarchivoFoto` del multipart de SU propio
   // registro/actualización de funcionario, no del establecimiento.
@@ -209,7 +203,6 @@ export function AddEstablishmentPage() {
       setFieldErrors({})
       setInvalidFields([])
       setHasSubmitted(false)
-      setConfirmPasswords({ principal: "", secretary: "" })
       setPrincipalEmployee(null)
       setSecretaryEmployee(null)
       principalMatchRef.current = null
@@ -223,10 +216,6 @@ export function AddEstablishmentPage() {
       setFieldErrors({})
       setInvalidFields([])
       setHasSubmitted(false)
-      setConfirmPasswords({
-        principal: existing.principal?.password ?? "",
-        secretary: existing.secretary?.password ?? "",
-      })
       setPrincipalEmployee(establishmentQuery.data.principalEmployee)
       setSecretaryEmployee(establishmentQuery.data.secretaryEmployee)
       principalMatchRef.current = null
@@ -236,13 +225,13 @@ export function AddEstablishmentPage() {
 
   useEffect(() => {
     if (!hasSubmitted) return
-    const validation = validateEstablishmentForm(formValues, confirmPasswords, {
+    const validation = validateEstablishmentForm(formValues, {
       logo: shield,
       photos,
     })
     setFieldErrors(validation.fieldErrors)
     setInvalidFields(validation.invalidFields)
-  }, [formValues, confirmPasswords, shield, photos, hasSubmitted])
+  }, [formValues, shield, photos, hasSubmitted])
 
   // Sin `onSuccess` acá: en real hay que enlazar rector/secretaria (si se
   // registraron de nuevo) DESPUÉS de crear el establecimiento y ANTES de
@@ -260,8 +249,25 @@ export function AddEstablishmentPage() {
   const queryClient = useQueryClient()
   // Avisos de "correo de activación enviado" de rector/secretaria (ver
   // persistPersonIfAny); se muestran junto al mensaje de éxito del EE.
+  // `activationFailedRef`: falló la reactivación por cambio de correo (error).
+  // `invitationWarningRef`: el alta quedó hecha pero la invitación no salió
+  // (warning — se puede reenviar desde la tabla de funcionarios).
   const activationNoticesRef = useRef<string[]>([])
   const activationFailedRef = useRef(false)
+  const invitationWarningRef = useRef(false)
+
+  function takeActivationNotices() {
+    const avisos = activationNoticesRef.current
+    const variant: "error" | "warning" | undefined = activationFailedRef.current
+      ? "error"
+      : invitationWarningRef.current
+        ? "warning"
+        : undefined
+    activationNoticesRef.current = []
+    activationFailedRef.current = false
+    invitationWarningRef.current = false
+    return { avisos, variant }
+  }
 
   const updateMutation = useUpdate({
     mutationConfig: {
@@ -270,13 +276,10 @@ export function AddEstablishmentPage() {
           notify(result.message, { variant: "error" })
           return
         }
-        const avisos = activationNoticesRef.current
-        activationNoticesRef.current = []
-        const fallo = activationFailedRef.current
-        activationFailedRef.current = false
+        const { avisos, variant } = takeActivationNotices()
         notify(
           [SUCCESS_MESSAGES.establishment.updated, ...avisos].join(" "),
-          fallo ? { variant: "error" } : undefined,
+          variant ? { variant } : undefined,
         )
         navigate({ to: paths.app.establishments.general.getHref() })
       },
@@ -294,7 +297,7 @@ export function AddEstablishmentPage() {
    * Devuelve true si la persona ya trae al menos un dato capturado (la
    * consideramos "presente" y por tanto debe persistirse).
    */
-  function personHasAnyData(person: Person | null, confirmPassword: string): boolean {
+  function personHasAnyData(person: Person | null): boolean {
     if (!person) {
       return false
     }
@@ -309,9 +312,7 @@ export function AddEstablishmentPage() {
       person.birthDate.trim() ||
       person.gender?.id ||
       person.email.trim() ||
-      person.phone.trim() ||
-      person.password.trim() ||
-      confirmPassword.trim(),
+      person.phone.trim(),
     )
   }
 
@@ -370,14 +371,13 @@ export function AddEstablishmentPage() {
     person: Person | null,
     existingEmployee: Employee | null,
     label: string,
-    confirmPassword: string,
     /** Foto recién elegida; `null` en edición = conservar la guardada. */
     foto: File | null,
     /** Ver el párrafo de `matchSnapshot` arriba. `null` si no hubo match, o
      * si el match ya traía `id` (esa rama no la necesita). */
     matchSnapshot: Partial<Person> | null,
   ): Promise<PersistedPerson | null> {
-    if (!person || !personHasAnyData(person, confirmPassword)) {
+    if (!person || !personHasAnyData(person)) {
       return null
     }
 
@@ -433,6 +433,15 @@ export function AddEstablishmentPage() {
         const registered = await registerFuncionario(person, foto)
         const persistedPerson = { ...person, id: registered.pkFuncionario }
 
+        // Alta sin contraseña: el backend manda el correo de activación (o
+        // reusa una cuenta activa existente) — ver `employeeInvitationNotice`.
+        const invitation = employeeInvitationNotice({
+          ...registered,
+          email: registered.email || toEmailInput(person.email),
+        })
+        activationNoticesRef.current.push(`${label}: ${invitation.message}`)
+        if (invitation.variant === "warning") invitationWarningRef.current = true
+
         // Ver "matchSnapshot" en el comentario de arriba: `fn_fun_crear`
         // reusó el TUSUARIO tal cual estaba, así que cualquier corrección
         // que el usuario haya hecho en el form todavía no llegó al backend.
@@ -472,9 +481,10 @@ export function AddEstablishmentPage() {
     event.preventDefault()
     activationNoticesRef.current = []
     activationFailedRef.current = false
+    invitationWarningRef.current = false
     setHasSubmitted(true)
 
-    const validation = validateEstablishmentForm(formValues, confirmPasswords, {
+    const validation = validateEstablishmentForm(formValues, {
       logo: shield,
       photos,
     })
@@ -501,7 +511,6 @@ export function AddEstablishmentPage() {
         nextPrincipal,
         principalEmployee,
         "Rector",
-        confirmPasswords["principal"] ?? "",
         photos["principal"] ?? null,
         principalMatchRef.current,
       )
@@ -514,7 +523,6 @@ export function AddEstablishmentPage() {
         nextSecretary,
         secretaryEmployee,
         "Secretaria",
-        confirmPasswords["secretary"] ?? "",
         photos["secretary"] ?? null,
         secretaryMatchRef.current,
       )
@@ -603,7 +611,11 @@ export function AddEstablishmentPage() {
       return
     }
 
-    notify(SUCCESS_MESSAGES.establishment.created)
+    const { avisos, variant } = takeActivationNotices()
+    notify(
+      [SUCCESS_MESSAGES.establishment.created, ...avisos].join(" "),
+      variant ? { variant } : undefined,
+    )
     navigate({ to: paths.app.establishments.general.getHref() })
   }
 
@@ -713,10 +725,6 @@ export function AddEstablishmentPage() {
                         invalidFields={invalidFields}
                         errors={fieldErrors}
                         showValidation={hasSubmitted}
-                        confirmPassword={confirmPasswords["principal"] ?? ""}
-                        onConfirmPasswordChange={(value) =>
-                          setConfirmPasswords((current) => ({ ...current, principal: value }))
-                        }
                         photo={photos["principal"] ?? null}
                         onPhotoChange={(file) =>
                           setPhotos((current) => ({ ...current, principal: file }))
@@ -744,10 +752,6 @@ export function AddEstablishmentPage() {
                         errors={fieldErrors}
                         showValidation={hasSubmitted}
                         required={false}
-                        confirmPassword={confirmPasswords["secretary"] ?? ""}
-                        onConfirmPasswordChange={(value) =>
-                          setConfirmPasswords((current) => ({ ...current, secretary: value }))
-                        }
                         photo={photos["secretary"] ?? null}
                         onPhotoChange={(file) =>
                           setPhotos((current) => ({ ...current, secretary: file }))

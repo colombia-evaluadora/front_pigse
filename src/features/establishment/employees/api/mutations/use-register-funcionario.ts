@@ -40,6 +40,16 @@ export interface RegisterFuncionarioResult {
   pkTusuario: number
   pkFuncionario: number
   email: string
+/**
+   * El alta ya no lleva `password`: el backend crea la cuenta pendiente de
+   * activación y manda al correo el enlace "Activa tu cuenta" (7 días).
+   * `invitacionEnviada`: se envió ese correo. `mensajeInvitacion`: no nulo
+   * si la cuenta se creó pero la invitación falló (texto para el usuario).
+   * Ambos vacíos = se reusó una cuenta activa existente. Ver
+   * `employeeInvitationNotice` en `lib/success-messages.ts`.
+   */
+  invitacionEnviada?: boolean
+  mensajeInvitacion?: string | null
 }
 
 function toRegisterFuncionarioRequest(person: Person) {
@@ -47,10 +57,10 @@ function toRegisterFuncionarioRequest(person: Person) {
     .filter(Boolean)
     .join(" ")
 
+  // Sin `password` a propósito: ver `invitacionEnviada` arriba.
   return {
     email: person.email,
     fullName,
-    password: person.password,
     identificacion: person.identification,
     primerNombre: person.firstName,
     primerApellido: person.lastName,
