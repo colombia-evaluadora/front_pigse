@@ -83,7 +83,6 @@ function toEmployee(row: RealEmployeeDetailRow): Employee {
       gender: null,
       email: toEmailInput(row.correo_electronico ?? ""),
       phone: row.telefono ?? "",
-      password: "",
     },
     employeeClass: toCatalogIdOnly(row.fk_tlv_clase_funcionario),
     educationLevel: toCatalogIdOnly(row.fk_tlv_nivel_ensenanza),

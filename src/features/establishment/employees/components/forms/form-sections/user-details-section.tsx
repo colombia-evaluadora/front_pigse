@@ -8,7 +8,7 @@ import { NoticeBanner } from "@/components/notice/notice-banner"
 import { ImageUploadField } from "@/components/image-upload-field"
 import { ArchivoImage } from "@/features/files/components/archivo-image"
 import { EMPLOYEE_ROLES } from "@/mocks/db/catalogs/employee-roles"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   ComboboxField,
@@ -24,18 +24,14 @@ import type { CatalogItem } from "@/types/catalog"
 import { useCatalogQuery } from "@/features/establishment/employees/api/query/use-catalogs"
 import { findPersonByDocument } from "@/features/establishment/employees/api/query/use-user-by-document"
 import type { Person } from "@/features/establishment/employees/api/types/person"
-import { passwordRules } from "@/features/auth/api/schema"
 
 type EmployeeRoleCode = (typeof EMPLOYEE_ROLES)[number]["code"]
 
-/**
- * Valor decorativo que se muestra (y se manda) cuando `person.accountExists`
- * es `true` — nunca es una contraseña real ni se usa como tal: el backend
- * (`FuncionarioRegistrationService`, REV V71) reutiliza la cuenta existente
- * por documento/correo y jamás toca su contraseña en ese camino. Solo tiene
- * que ser una cadena no vacía para no chocar con `@NotBlank` del lado Java.
- */
-export const PASSWORD_PLACEHOLDER = "••••••••"
+// Sin campos de contraseña: el alta de funcionario (y de rector/secretaria)
+// ya no la pide. `POST /auth/register/pigse/funcionario` crea la cuenta
+// pendiente de activación y le manda al correo el enlace "Activa tu cuenta"
+// (vigencia 7 días), donde la persona define su propia contraseña. Al
+// editar nunca se mandó (ver `update.ts`).
 
 interface UserFormProps {
   role?: EmployeeRoleCode
@@ -54,14 +50,6 @@ interface UserFormProps {
    */
   required?: boolean
   /**
-   * Estado UI para la confirmación de contraseña. Vive fuera de la entidad
-   * `Person` porque es un dato de formulario, no un atributo de negocio.
-   * Si se provee, el form se vuelve controlado en ese campo; si no, lo
-   * maneja internamente.
-   */
-  confirmPassword?: string
-  onConfirmPasswordChange?: (value: string) => void
-  /**
    * Foto recién elegida, todavía sin subir. Igual que el escudo del
    * establecimiento, vive en el padre: es él quien la manda como
    * `fkTarchivoFoto` del multipart al registrar o actualizar. Sin estas dos
@@ -77,7 +65,7 @@ interface UserFormProps {
   onRemovePhoto?: () => void
   /**
    * Se dispara con el patch crudo que devolvió `findPersonByDocument`
-   * (antes de mezclarlo con `PASSWORD_PLACEHOLDER`) cada vez que el
+   * cada vez que el
    * autocompletado encuentra o pierde una coincidencia — `null` cuando el
    * documento cambia y se resetea el match anterior. El padre lo usa para
    * dos cosas que este form no puede decidir por sí solo: (1) si el match
@@ -100,7 +88,6 @@ function createEmptyPerson(): Person {
     gender: null,
     email: "",
     phone: "",
-    password: "",
   }
 }
 
@@ -113,8 +100,6 @@ export function UserDetailsForm({
   errors = {},
   showValidation = false,
   required = true,
-  confirmPassword: confirmPasswordProp,
-  onConfirmPasswordChange,
   photo: photoProp,
   onPhotoChange,
   onRemovePhoto,
@@ -138,19 +123,9 @@ export function UserDetailsForm({
   const genderLabels = Object.fromEntries(genders.map((item) => [item.id, item.name]))
   const person = value ?? createEmptyPerson()
 
-  const isConfirmControlled = confirmPasswordProp !== undefined
-  // El form puede correr en dos modos:
-  // - **Controlado**: el padre pasa `confirmPassword` y `onConfirmPasswordChange`
-  //   (necesita el valor para su propia validación, ver
-  //   `validate-establishment-form.ts`). El form es un espejo.
-  // - **No controlado**: el form guarda el valor localmente. Como `confirmPassword`
-  //   no es parte del modelo `Person`, queda acá hasta el submit.
-  const [internalConfirmPassword, setInternalConfirmPassword] = useState(() => person.password)
-  const confirmPassword = isConfirmControlled ? confirmPasswordProp : internalConfirmPassword
-
-  // Foto del usuario, con el mismo doble modo que la confirmación de
-  // contraseña: si el padre pasa `photo`/`onPhotoChange` la manda él al
-  // backend; si no, queda acá y solo vive mientras el form está montado.
+  // Foto del usuario, en dos modos: si el padre pasa `photo`/`onPhotoChange`
+  // la manda él al backend; si no, queda acá y solo vive mientras el form
+  // está montado.
   // No es parte de `Person` porque el modelo guarda el `pk_tarchivo` que
   // devuelve el backend, no el `File` que el usuario acaba de elegir.
   const isPhotoControlled = photoProp !== undefined
@@ -164,55 +139,28 @@ export function UserDetailsForm({
     setInternalPhoto(next)
   }
 
-  // Sincroniza la confirmación cuando el padre **carga otra persona** (no
-  // solo edita la actual). El `useEffect` original re-sincronizaba cada vez
-  // que el confirm quedaba vacío, pisando la edición del usuario sin razón.
-  // Ahora solo dispara cuando cambia el `id` — la "primera vez" + cada
-  // carga de un registro distinto.
-  const lastSeenId = useRef(person.id)
-  useEffect(() => {
-    if (isConfirmControlled) return
-    if (lastSeenId.current === person.id) return
-    lastSeenId.current = person.id
-    setInternalConfirmPassword(person.password)
-  }, [isConfirmControlled, person.id, person.password])
-
-  const setConfirmPassword = (next: string) => {
-    if (isConfirmControlled) {
-      onConfirmPasswordChange?.(next)
-      return
-    }
-    setInternalConfirmPassword(next)
-  }
-
-  const passwordsMatch = person.password === confirmPassword
   const isInvalid = (field: string) => showValidation && invalidFields.includes(field)
   // Mensaje debajo del campo: solo tras el primer submit, igual que el borde rojo.
   const errorFor = (field: string) => (showValidation ? errors[field] : undefined)
-  // Guía en vivo: qué requisito falta mientras se escribe una contraseña
-  // nueva, antes de intentar guardar — fuente única `passwordRules`
-  // (`auth/api/schema.ts`).
-  const passwordHint =
-    !person.accountExists && person.password.length > 0
-      ? passwordRules.find((rule) => !rule.test(person.password))?.message
-      : undefined
+  // Alta de una cuenta nueva (sin `id` ni cuenta encontrada por documento):
+  // el correo es a donde llega la invitación de activación.
+  const isNewAccount = !person.id && !person.accountExists
 
   const emitChange = (patch: Partial<Person>) => {
     onChange({ ...person, ...patch })
   }
 
   // Autocompletado: cuando hay tipo + número de documento, busca un
-  // TUSUARIO existente y vuelca sus datos sobre el form (nunca pisa
-  // `password` con datos reales, que no existe en TUSUARIO). Debounced
+  // TUSUARIO existente y vuelca sus datos sobre el form. Debounced
   // para no pegarle al backend en cada tecla; se ignora la respuesta si
   // el documento cambió mientras la búsqueda estaba en vuelo (evita
   // pisar el form con datos de una búsqueda vieja).
   const documentTypeId = person.documentType?.id ?? null
   const identification = person.identification
   // Solo gobierna el toast, NO si la búsqueda corre: la búsqueda tiene que
-  // correr también al abrir "editar" (para que el password quede con el
-  // placeholder + bloqueado si la persona ya tiene cuenta, igual que en
-  // alta) — lo que no queremos ahí es el aviso de "cuenta encontrada",
+  // correr también al abrir "editar" (para marcar `accountExists` si la
+  // persona ya tiene cuenta, igual que en alta) — lo que no queremos ahí
+  // es el aviso de "cuenta encontrada",
   // porque nadie tecleó nada, solo se cargó un registro que ya la tenía.
   const isUserEditingDocument = useRef(false)
   useEffect(() => {
@@ -225,7 +173,7 @@ export function UserDetailsForm({
     // Reset optimista: en cuanto el documento cambia, ya no se puede
     // asumir que sigue siendo la cuenta (ni, si la había, el
     // TFUNCIONARIO ni la foto) que encontró la búsqueda anterior — se
-    // desbloquea la contraseña y se limpian TODOS los datos personales
+    // limpian TODOS los datos personales
     // heredados del match previo, y el lookup de abajo los vuelve a
     // completar solo si el documento nuevo también coincide con una
     // cuenta real. Sin este reset, cambiar de documento hacia una
@@ -234,7 +182,6 @@ export function UserDetailsForm({
     if (person.accountExists) {
       emitChange({
         accountExists: false,
-        password: "",
         id: undefined,
         photoArchivoId: null,
         firstName: "",
@@ -246,7 +193,6 @@ export function UserDetailsForm({
         phone: "",
         email: "",
       })
-      setConfirmPassword("")
       onMatched?.(null)
       setAccountNotice(null)
     }
@@ -257,14 +203,10 @@ export function UserDetailsForm({
         .then((found) => {
           if (cancelled || !found) return
           // `found.accountExists` ya viene en `true` (ver
-          // use-user-by-document.ts) — acá solo se agrega el
-          // valor decorativo de la contraseña, nunca una real.
-          // `onMatched` viaja ANTES de mezclar el placeholder: el
-          // padre necesita el patch crudo tal cual vino del
-          // backend, no la contraseña decorativa.
+          // use-user-by-document.ts). El padre recibe el patch
+          // crudo tal cual vino del backend.
           onMatched?.(found)
-          emitChange({ ...found, password: PASSWORD_PLACEHOLDER })
-          setConfirmPassword(PASSWORD_PLACEHOLDER)
+          emitChange(found)
           if (isUserEditingDocument.current) {
             accountNoticeIdRef.current += 1
             setAccountNotice({
@@ -463,7 +405,7 @@ export function UserDetailsForm({
         <Field
           orientation="vertical"
           variant="outlined"
-          className="w-full"
+          className="w-full md:col-span-2"
           data-invalid={isInvalid(`${fieldPrefix}.email`) ? "true" : undefined}
         >
           <FieldLabel htmlFor="user-email">Correo Electrónico{required ? "*" : ""}</FieldLabel>
@@ -475,85 +417,36 @@ export function UserDetailsForm({
             aria-invalid={isInvalid(`${fieldPrefix}.email`)}
             onChange={(event) => emitChange({ email: toEmailInput(event.target.value) })}
           />
-          <FieldError>{errorFor(`${fieldPrefix}.email`)}</FieldError>
+          {errorFor(`${fieldPrefix}.email`) ? (
+            <FieldError>{errorFor(`${fieldPrefix}.email`)}</FieldError>
+          ) : isNewAccount ? (
+            <FieldDescription>
+              A este correo llegará el enlace para activar la cuenta y crear la contraseña.
+            </FieldDescription>
+          ) : null}
         </Field>
         <Field
           orientation="vertical"
           variant="outlined"
           className="w-full"
-          data-invalid={isInvalid(`${fieldPrefix}.password`) ? "true" : undefined}
+          data-invalid={isInvalid(`${fieldPrefix}.phone`) ? "true" : undefined}
         >
-          <FieldLabel htmlFor="user-password">
-            Contraseña{required ? "*" : ""}
-            {person.accountExists ? " (cuenta existente)" : ""}
-          </FieldLabel>
+          <FieldLabel htmlFor="user-phone">Teléfono</FieldLabel>
           <Input
-            id="user-password"
+            id="user-phone"
             size="sm"
             placeholder="Agregar"
-            type="password"
-            // El backend nunca devuelve el hash, así que este
-            // campo siempre arranca vacío al editar — pero el
-            // navegador no lo sabe: al ver un `type="password"`
-            // sin pista, Chrome/el gestor de contraseñas lo
-            // autocompletaba con la contraseña guardada de esa
-            // cuenta (sin tocar "Confirmar", que sí quedaba
-            // vacío), disparando "las contraseñas no coinciden"
-            // sin que el usuario escribiera nada.
-            // `autoComplete="new-password"` es la señal estándar
-            // para "esto no es un login, es un campo para poner
-            // una contraseña nueva" — ningún navegador debería
-            // autorellenarlo con una guardada.
-            autoComplete="new-password"
-            // `accountExists`: el autocompletado por documento
-            // encontró una cuenta real — se bloquea el campo (con
-            // el valor decorativo `PASSWORD_PLACEHOLDER`) para
-            // que quede claro que la persona se liga siendo la
-            // misma, sin poder cambiarle la contraseña desde acá.
-            disabled={person.accountExists}
-            value={person.password}
-            aria-invalid={isInvalid(`${fieldPrefix}.password`)}
-            onChange={(event) => emitChange({ password: event.target.value })}
+            type="tel"
+            // TUSUARIO.TELEFONO / RegisterUsuarioRequest.telefono
+            // son VARCHAR(30)/@Size(max=30) — sin restringir a
+            // solo dígitos (a diferencia de NIT/DANE), un
+            // teléfono legítimamente puede traer "+", espacios o
+            // una extensión.
+            maxLength={30}
+            value={person.phone}
+            aria-invalid={isInvalid(`${fieldPrefix}.phone`)}
+            onChange={(event) => emitChange({ phone: event.target.value })}
           />
-          {/* Guía en vivo: qué requisito falta mientras se escribe
-              una contraseña nueva, antes de intentar guardar —
-              fuente única `passwordRules` (`auth/api/schema.ts`). */}
-          <FieldError>{errorFor(`${fieldPrefix}.password`) ?? passwordHint}</FieldError>
-        </Field>
-        <Field
-          orientation="vertical"
-          variant="outlined"
-          className="w-full"
-          data-invalid={isInvalid(`${fieldPrefix}.confirmPassword`) ? "true" : undefined}
-        >
-          <FieldLabel htmlFor="user-confirm-password">
-            Confirmar Contraseña{required ? "*" : ""}
-          </FieldLabel>
-          <Input
-            id="user-confirm-password"
-            size="sm"
-            placeholder="Agregar"
-            type="password"
-            // Mismo motivo que "user-password": sin esto el
-            // navegador podía autocompletar uno de los dos
-            // campos (no necesariamente el mismo) y producir un
-            // mismatch fantasma.
-            autoComplete="new-password"
-            disabled={person.accountExists}
-            value={confirmPassword}
-            aria-invalid={isInvalid(`${fieldPrefix}.confirmPassword`)}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-          />
-          {/* Mismatch en vivo, pegado al campo que corrige — antes
-              vivía como párrafo suelto al final del formulario,
-              lejos de "Contraseña"/"Confirmar" y sin relación
-              visual con ellos. */}
-          <FieldError>
-            {errorFor(`${fieldPrefix}.confirmPassword`) ??
-              (!passwordsMatch && person.password.length > 0 && confirmPassword.length > 0
-                ? "Las contraseñas no coinciden."
-                : undefined)}
-          </FieldError>
         </Field>
       </div>
       <div className="grid grid-cols-1 gap-x-4 gap-y-2 md:grid-cols-3">
@@ -605,29 +498,6 @@ export function UserDetailsForm({
             </ComboboxFieldContent>
           </ComboboxField>
           <FieldError>{errorFor(`${fieldPrefix}.gender`)}</FieldError>
-        </Field>
-        <Field
-          orientation="vertical"
-          variant="outlined"
-          className="w-full"
-          data-invalid={isInvalid(`${fieldPrefix}.phone`) ? "true" : undefined}
-        >
-          <FieldLabel htmlFor="user-phone">Teléfono</FieldLabel>
-          <Input
-            id="user-phone"
-            size="sm"
-            placeholder="Agregar"
-            type="tel"
-            // TUSUARIO.TELEFONO / RegisterUsuarioRequest.telefono
-            // son VARCHAR(30)/@Size(max=30) — sin restringir a
-            // solo dígitos (a diferencia de NIT/DANE), un
-            // teléfono legítimamente puede traer "+", espacios o
-            // una extensión.
-            maxLength={30}
-            value={person.phone}
-            aria-invalid={isInvalid(`${fieldPrefix}.phone`)}
-            onChange={(event) => emitChange({ phone: event.target.value })}
-          />
         </Field>
       </div>
     </div>
