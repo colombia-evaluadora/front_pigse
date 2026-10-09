@@ -52,9 +52,9 @@ async function fetchComplianceRows(
     return unwrapPaginated(response)
   }
 
-  // El backend espera los cuatro arrays de estado como top-level
-  // BODY.FILTERS.* (PEI/PEC/PMI/PFI) y sorting como un unico objeto -- ver
-  // toSingleSort.
+  // El backend espera los arrays de estado como top-level BODY.FILTERS.*
+  // (PEI/PEC/PMI/PFI) y sorting como un unico objeto -- ver toSingleSort.
+  // MUNICIPIOS/ETNIAS/PLAZO (V524) son opcionales: vacios no filtran.
   const body = {
     filters: {
       search: params.filters.search,
@@ -62,6 +62,9 @@ async function fetchComplianceRows(
       pec: params.filters.pec,
       pmi: params.filters.pmi,
       pfi: params.filters.pfi,
+      municipios: [],
+      etnias: params.filters.etnias || null,
+      plazo: params.filters.plazo,
     },
     sorting: toSingleSort(params.sorting),
     pageIndex: params.pageIndex,

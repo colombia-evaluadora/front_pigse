@@ -45,7 +45,7 @@ export function CategoryFileActions({ category }: { category: DocumentCategory }
         render={
           <Link
             to={paths.app.visor.getHref(category.type)}
-            search={{ fileName, archivoId: category.archivoId, downloadUrl }}
+            search={{ fileName, archivoId: category.archivoId, downloadUrl, origen: "gestion" }}
           />
         }
         nativeButton={false}
