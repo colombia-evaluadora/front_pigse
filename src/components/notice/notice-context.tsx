@@ -26,12 +26,14 @@ interface NoticeDispatch {
 const DEFAULT_AUTO_CLOSE: Record<NoticeVariant, number> = {
   info: 7000,
   success: 7000,
+  warning: 12000,
   error: 12000,
 }
 
 const FALLBACK: NoticeDispatch = {
   notify: (message, options) => {
     if (options?.variant === "error") toast.error(message)
+    else if (options?.variant === "warning") toast.warning(message)
     else toast.success(message)
   },
   dismiss: () => {},

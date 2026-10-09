@@ -2,16 +2,23 @@ import { PIGSE_ROLES, hasAnyRole } from "@/lib/auth-mapper"
 import type { User } from "@/types/api"
 
 /**
- * Reglas de acceso a rutas del aplicativo por rol de PIGSE.
+ * Capacidades finas por rol de PIGSE dentro de una pantalla (¿puede
+ * escribir?, ¿puede fijar la fecha límite?).
  *
- * **Esta tabla es un espejo del backend, no la fuente de verdad.** El permiso
- * real vive en `public.role_query` (query -> roles) y `public.role_route`
- * (menú -> roles) del SSO; el gateway rechaza con 403 lo que no corresponda.
- * Acá se replica para poder ocultar/redirigir en el cliente ANTES de pegarle
- * al backend — mejor UX que un 403 en la cara.
+ * **Qué pantallas puede ABRIR cada usuario no se decide acá**: lo decide su
+ * menú (`GET /pigse/my-menus`, `role_route` del SSO) en el guard de rutas
+ * (`menuGuardRoute` en `router.tsx` + `features/navigation/lib/
+ * route-access.ts`). La vieja tabla `ROUTE_ACCESS` / `findFirstAllowedPath`
+ * que vivía en este archivo replicaba `role_route` a mano, se desincronizaba
+ * y podía mandar a un usuario a una ruta que el guard después bloquea: se
+ * borró.
  *
- * Si cambiás permisos en la BD, hay que actualizar esta tabla. La consulta
- * que la genera:
+ * **Estas listas son un espejo del backend, no la fuente de verdad.** El
+ * permiso real vive en `public.role_query` (query -> roles) del SSO; el
+ * gateway rechaza con 403 lo que no corresponda. Acá se replica solo para
+ * ocultar/deshabilitar acciones ANTES de pegarle al backend — mejor UX que
+ * un 403 en la cara. Si cambiás permisos en la BD, hay que actualizarlas. La
+ * consulta que las genera:
  *
  * ```sql
  * SELECT q.path_template, q.http_method,
@@ -22,17 +29,7 @@ import type { User } from "@/types/api"
  *  WHERE q.microservice_id = 12          -- microservice 'pigse'
  *  GROUP BY q.id_query, q.path_template, q.http_method;
  * ```
- *
- * Los `prefix` se matchean contra el pathname **relativo** a `/app`
- * (`/app/gestion-documental` -> `/gestion-documental`).
  */
-
-/** Roles que pueden VER el módulo de gestión documental (`GET /documentos`). */
-export const DOCUMENT_READERS = [
-  PIGSE_ROLES.Administrador,
-  PIGSE_ROLES.Rector,
-  PIGSE_ROLES.Secretario,
-] as const
 
 /**
  * Roles que pueden ESCRIBIR (subir / dar de baja) documentos.
@@ -72,52 +69,6 @@ export const DOCUMENT_DEADLINE_WRITERS = [
   PIGSE_ROLES.SecretariaTerritorial,
 ] as const
 
-/** Roles que pueden ver el tablero de monitoreo (`GET /cumplimiento/*`). */
-export const COMPLIANCE_VIEWERS = [
-  PIGSE_ROLES.Administrador,
-  PIGSE_ROLES.SecretariaTerritorial,
-  PIGSE_ROLES.DirectorEnteTerritorial,
-  PIGSE_ROLES.JefeAreaCalidad,
-  PIGSE_ROLES.JefeAreaCobertura,
-  PIGSE_ROLES.JefeAreaPlaneacion,
-  PIGSE_ROLES.JefeSistemaEnteTerritorial,
-] as const
-
-/**
- * Roles que pueden ver "Actividad de usuarios"
- * (`POST /pigse/usuarios/actividad/query`, V495). Espejo exacto de los
- * roles que acepta el backend para esa query — otro rol responde 403 (sin
- * fila en `role_query`, el gate PL/pgSQL también da 42501).
- */
-export const USER_ACTIVITY_VIEWERS = [
-  PIGSE_ROLES.SecretariaTerritorial,
-  PIGSE_ROLES.Secretario,
-  PIGSE_ROLES.JefeAreaCalidad,
-  PIGSE_ROLES.JefeAreaPlaneacion,
-  PIGSE_ROLES.JefeAreaCobertura,
-  PIGSE_ROLES.Administrador,
-] as const
-
-interface AccessRule {
-  prefix: string
-  allowedRoles: readonly string[]
-}
-
-const ROUTE_ACCESS: AccessRule[] = [
-  { prefix: "/administracion", allowedRoles: [PIGSE_ROLES.Administrador] },
-  { prefix: "/establecimiento-educativo", allowedRoles: [PIGSE_ROLES.Administrador] },
-  { prefix: "/gestion-documental", allowedRoles: DOCUMENT_READERS },
-  { prefix: "/monitoreo-cumplimiento", allowedRoles: COMPLIANCE_VIEWERS },
-  { prefix: "/actividad-usuarios", allowedRoles: USER_ACTIVITY_VIEWERS },
-  // El visor no es ítem de menú: lo abren tanto "Gestión documental" (al
-  // Consultar un documento) como "Monitoreo y cumplimiento" (al clickear el
-  // dot verde de un EE). Por eso acepta la unión de los dos conjuntos.
-  {
-    prefix: "/visor",
-    allowedRoles: [...new Set<string>([...DOCUMENT_READERS, ...COMPLIANCE_VIEWERS])],
-  },
-]
-
 type MaybeUser = Pick<User, "roles"> | null | undefined
 
 /** ¿El usuario puede subir / dar de baja documentos? */
@@ -128,20 +79,4 @@ export function canWriteDocuments(user: MaybeUser): boolean {
 /** ¿El usuario puede fijar la fecha límite global o gestionar excepciones? */
 export function canWriteDocumentDeadline(user: MaybeUser): boolean {
   return hasAnyRole(user, DOCUMENT_DEADLINE_WRITERS)
-}
-
-/**
- * Primera ruta absoluta (con `/app`) que el usuario puede ver. Alimenta el
- * redirect de `/app` y el botón "Ir a mi inicio" de la pantalla 403.
- *
- * Si no matchea ninguna regla devuelve `/app/no-autorizado`: es un usuario
- * autenticado en el SSO pero sin ningún rol de PIGSE — pasa de verdad (en la
- * BD hay ~34 usuarios sin rol PIGSE), y mandarlo a `/login` lo dejaría en un
- * bucle porque su sesión SÍ es válida.
- */
-export function findFirstAllowedPath(user: MaybeUser): string {
-  for (const rule of ROUTE_ACCESS) {
-    if (hasAnyRole(user, rule.allowedRoles)) return `/app${rule.prefix}`
-  }
-  return "/app/no-autorizado"
 }

@@ -8,6 +8,7 @@ import { isDocumentActionable } from "@/features/document-management/api/ui-mapp
 import { StatusIndicator } from "@/features/document-management/components/table/status-indicator"
 import { UploadDocumentCategoryDialog } from "@/features/document-management/components/dialogs/dialog-upload-document-category"
 import { DeleteDocumentCategoryDialog } from "@/features/document-management/components/dialogs/dialog-delete-document-category"
+import { CategoryFileActions } from "@/features/document-management/components/table/category-file-actions"
 
 const categoryColumn: ColumnDef<DocumentCategory> = {
   accessorKey: "categoriaName",
@@ -24,6 +25,15 @@ const statusColumn: ColumnDef<DocumentCategory> = {
   meta: { label: "Estado de Entrega" },
   header: ({ column }) => <DataTableColumnHeader column={column} title="Estado de Entrega" />,
   cell: ({ row }) => <StatusIndicator status={row.original.status} />,
+  enableSorting: false,
+}
+
+const fileColumn: ColumnDef<DocumentCategory> = {
+  id: "archivo",
+  accessorKey: "fileName",
+  meta: { label: "Archivo" },
+  header: ({ column }) => <DataTableColumnHeader column={column} title="Archivo" />,
+  cell: ({ row }) => <CategoryFileActions category={row.original} />,
   enableSorting: false,
 }
 
@@ -56,6 +66,7 @@ const actionColumn: ColumnDef<DocumentCategory> = {
 export const documentCategoryColumns: ColumnDef<DocumentCategory>[] = [
   categoryColumn,
   statusColumn,
+  fileColumn,
   actionColumn,
 ]
 
@@ -63,4 +74,5 @@ export const documentCategoryColumns: ColumnDef<DocumentCategory>[] = [
 export const documentCategoryReadOnlyColumns: ColumnDef<DocumentCategory>[] = [
   categoryColumn,
   statusColumn,
+  fileColumn,
 ]

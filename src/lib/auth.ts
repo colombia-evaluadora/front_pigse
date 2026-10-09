@@ -75,6 +75,13 @@ export function useLogin({
       // "Mantener sesión iniciada" ya quedó decidido del lado del servidor.
       setAuthToken(data.token)
       queryClient.setQueryData(USER_QUERY_KEY, toAuthUserFromToken(data.token))
+      // El menú (`["navigation", "menu"]`, `staleTime: Infinity`) decide a qué
+      // rutas se puede entrar (guard de `router.tsx`). El logout y la sesión
+      // vencida ya limpian todo el cache, pero un menú de una sesión anterior
+      // nunca debe sobrevivir a un login: se tira acá también para que el
+      // `redirectTo` se evalúe siempre contra el menú del usuario que acaba
+      // de entrar.
+      queryClient.removeQueries({ queryKey: ["navigation"] })
       mutationConfig?.onSuccess?.(data, variables, ...rest)
     },
   })

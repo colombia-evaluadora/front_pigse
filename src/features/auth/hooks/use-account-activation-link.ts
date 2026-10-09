@@ -1,5 +1,6 @@
 import { useActivationTokenStatusQuery } from "@/features/auth/api/query/use-activation-token-status-query"
 import { useCountdown } from "@/features/auth/hooks/use-countdown"
+import { formatTtl } from "@/features/auth/utils/format-duration"
 
 export interface AccountActivationLink {
   /** Todavía no se sabe nada del enlace. */
@@ -12,25 +13,10 @@ export interface AccountActivationLink {
   isUsable: boolean
   /** Correo destino, ya enmascarado por el backend. */
   maskedEmail: string | null
-  /** Tiempo que le queda, listo para pintar ("9:07"). */
+  /** Tiempo que le queda, listo para pintar ("9:07", "6 días y 23 h"). */
   remainingLabel: string | null
   /** Vida total del enlace, lista para pintar ("2 días"). */
   ttlLabel: string | null
-}
-
-/** 172800 -> "2 días"; 1800 -> "30 minutos"; 45 -> "45 segundos". */
-function formatTtl(seconds: number): string {
-  if (seconds < 60) return `${seconds} segundos`
-  if (seconds < 3600) {
-    const mins = Math.round(seconds / 60)
-    return `${mins} ${mins === 1 ? "minuto" : "minutos"}`
-  }
-  if (seconds < 86400) {
-    const hours = Math.round(seconds / 3600)
-    return `${hours} ${hours === 1 ? "hora" : "horas"}`
-  }
-  const days = Math.round(seconds / 86400)
-  return `${days} ${days === 1 ? "día" : "días"}`
 }
 
 /**

@@ -1,6 +1,5 @@
 import { z } from "zod"
 
-import { passwordRules } from "@/features/auth/api/schema"
 import { optionalImageFile } from "@/lib/image-file"
 import type { EstablishmentDetails } from "@/features/establishment/institution/api/types/establishment"
 import type { Person } from "@/features/establishment/employees/api/types/person"
@@ -9,21 +8,13 @@ import { validarFormatoPersona } from "@/features/establishment/shared/person-fi
 export interface EstablishmentFormValidationResult {
   /** Etiquetas de los campos que fallaron, en el orden en que se validan. */
   errors: string[]
-  /** Rutas de los campos que fallaron (`basicInfo.name`, `principal.password`, …). */
+  /** Rutas de los campos que fallaron (`basicInfo.name`, `principal.email`, …). */
   invalidFields: string[]
   /**
    * Mensaje a mostrar debajo de cada campo, indexado por su ruta. Es lo que
    * consumen los formularios; `errors` e `invalidFields` se derivan de acá.
    */
   fieldErrors: Record<string, string>
-}
-
-/**
- * Confirmaciones de contraseña que el formulario mantiene como estado de UI,
- * indexadas por el `fieldPrefix` de cada persona validada.
- */
-export interface EstablishmentFormConfirmPasswords {
-  [fieldPrefix: string]: string
 }
 
 /** Texto obligatorio: se ignora el relleno de espacios. */
@@ -104,8 +95,6 @@ const PERSON_LABELS: Record<string, string> = {
   lastName: "primer apellido",
   email: "correo electrónico",
   gender: "género",
-  password: "contraseña",
-  confirmPassword: "confirmación de contraseña",
 }
 
 function isBlank(value: string | null | undefined): boolean {
@@ -139,9 +128,8 @@ function makePersonSchema(required: boolean) {
   return z
     .object({
       person: z.custom<Person | null>(),
-      confirmPassword: z.string(),
     })
-    .superRefine(({ person, confirmPassword }, ctx) => {
+    .superRefine(({ person }, ctx) => {
       if (!required && (!person || isPersonEmpty(person))) {
         return
       }
@@ -158,24 +146,11 @@ function makePersonSchema(required: boolean) {
         gender: null,
         email: "",
         phone: "",
-        password: "",
       }
 
       const require = (path: string, value: string | null | undefined, message: string) => {
         if (isBlank(value)) {
           ctx.addIssue({ code: "custom", path: [path], message })
-        }
-      }
-
-      const requirePasswordStrength = (value: string | null | undefined) => {
-        if (isBlank(value)) {
-          return
-        }
-
-        for (const rule of passwordRules) {
-          if (!rule.test(value as string)) {
-            ctx.addIssue({ code: "custom", path: ["password"], message: rule.message })
-          }
         }
       }
 
@@ -192,77 +167,23 @@ function makePersonSchema(required: boolean) {
 
       /**
        * Persona SIN `id` todavía (nunca tuvo rector/secretaria enlazado, o
-       * el GET no trajo uno): al guardar va a `POST /register/funcionario`
+       * el GET no trajo uno): al guardar va a `POST /register/pigse/funcionario`
        * (`RegisterUsuarioRequest`, auth-center), que exige `@NotBlank` en
-       * `email` y `password` — son la cuenta y el login del funcionario,
-       * no hay forma de omitirlos (a diferencia de fecha de nacimiento,
-       * que sí es opcional de verdad). Persona CON `id` (ya existente) va
-       * a PATCH `fn_fun_actualizar`, que tolera estos campos vacíos
-       * (COALESCE, nunca resetea la contraseña) — por eso solo se exigen
-       * acá cuando todavía no existe.
-       *
-       * `accountExists` (autocompletado por documento, ver
-       * `use-user-by-document.ts`/`UserDetailsForm`): la persona no tiene
-       * `id` (no hay un `TFUNCIONARIO` conocido para ESTE establecimiento
-       * todavía), pero SÍ tiene una cuenta real — el backend la reconoce y
-       * reutiliza por documento/correo (`FuncionarioRegistrationService`,
-       * V71) sin tocarle la contraseña, así que acá tampoco hace falta
-       * pedirla (el campo queda bloqueado en el form, ver
-       * `UserDetailsForm`).
+       * `email` — es la cuenta del funcionario y a donde llega la invitación
+       * de activación (sin contraseña: la define la persona al activar la
+       * cuenta desde el correo). Persona CON `id` (ya existente) va a PATCH
+       * `fn_fun_actualizar`, que tolera estos campos vacíos (COALESCE) — por
+       * eso solo se exigen acá cuando todavía no existe.
        */
       if (!p.id) {
         require("email", p.email, "Ingresa el correo electrónico.")
         require("gender", p.gender?.name, "Selecciona el género.")
-
-        if (!p.accountExists) {
-          require("password", p.password, "Ingresa la contraseña.")
-          require("confirmPassword", confirmPassword, "Repite la contraseña.")
-          requirePasswordStrength(p.password)
-
-          if (!isBlank(p.password) && !isBlank(confirmPassword) && p.password !== confirmPassword) {
-            ctx.addIssue({
-              code: "custom",
-              path: ["confirmPassword"],
-              message: "Las contraseñas no coinciden.",
-            })
-          }
-        }
-        return
-      }
-
-      if (p.accountExists) {
-        return
-      }
-
-      if (p.accountExists) {
-        return
-      }
-
-      // Contraseña: sólo se valida si escribió algo (en cualquiera de los dos campos).
-      const hasPassword = !isBlank(p.password)
-      const hasConfirm = !isBlank(confirmPassword)
-
-      if (!hasPassword && !hasConfirm) {
-        return
-      }
-
-      require("password", p.password, "Ingresa la contraseña.")
-      require("confirmPassword", confirmPassword, "Repite la contraseña.")
-      requirePasswordStrength(p.password)
-
-      if (hasPassword && hasConfirm && p.password !== confirmPassword) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["confirmPassword"],
-          message: "Las contraseñas no coinciden.",
-        })
       }
     })
 }
 
 export function validateEstablishmentForm(
   values: EstablishmentDetails,
-  confirmPasswords: EstablishmentFormConfirmPasswords = {},
   files: EstablishmentFormFiles = {},
 ): EstablishmentFormValidationResult {
   const errors: string[] = []
@@ -318,10 +239,7 @@ export function validateEstablishmentForm(
       )
     }
 
-    const result = makePersonSchema(required).safeParse({
-      person,
-      confirmPassword: confirmPasswords[fieldPrefix] ?? "",
-    })
+    const result = makePersonSchema(required).safeParse({ person })
 
     if (result.success) {
       continue
@@ -332,16 +250,6 @@ export function validateEstablishmentForm(
       if (issue) {
         collect(`${fieldPrefix}.${field}`, issue.message, `${label}: ${fieldLabel}`)
       }
-    }
-
-    // "No coinciden" reemplaza al mensaje de campo vacío cuando ambos tienen
-    // contenido, así que se busca aparte para que el resumen lo refleje.
-    const mismatch = result.error.issues.find(
-      (item) => item.path.join(".") === "confirmPassword" && item.message.includes("no coinciden"),
-    )
-    if (mismatch && !errors.includes(`${label}: las contraseñas no coinciden`)) {
-      fieldErrors[`${fieldPrefix}.confirmPassword`] = mismatch.message
-      errors.push(`${label}: las contraseñas no coinciden`)
     }
   }
 

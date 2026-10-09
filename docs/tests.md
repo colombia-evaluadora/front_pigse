@@ -47,7 +47,7 @@ se usa `vi.mock("@/lib/api-client", ...)`. El helper está en
 
 ## Cuándo testear
 
-- **Sí**: lógica con reglas (RBAC en `lib/auth-routes.ts`, `parseo` de
+- **Sí**: lógica con reglas (acceso por menú en `features/navigation/lib/route-access.ts`, `parseo` de
   query strings en `query-syntax.ts`, validadores de formulario).
 - **Sí**: hooks con mutaciones (los mocks verifican que `onSuccess`
   dispara correctamente).

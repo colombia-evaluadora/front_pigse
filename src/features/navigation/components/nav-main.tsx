@@ -59,6 +59,11 @@ function isUnder(pathname: string, url: string) {
  * establecimiento viven **al lado** de la lista (`/agregar`, `/editar/$id` vs
  * `/general`), no debajo, así que `isUnder` no las alcanza. Se resuelven a la
  * URL del item que tienen que marcar.
+ *
+ * Es la misma pregunta ("¿de qué menú es esta ruta?") que responde
+ * `ROUTE_MENU_OWNERS` en `features/navigation/lib/route-access.ts` para el
+ * guard de rutas: una ruta que necesita alias acá casi seguro necesita su
+ * dueño allá, o el guard la bloquea para todos.
  */
 const NAV_PATH_ALIASES: Array<[from: string, to: string]> = [
   ["/app/establecimiento-educativo/agregar", "/app/establecimiento-educativo/general"],

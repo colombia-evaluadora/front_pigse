@@ -30,7 +30,8 @@ export interface Person {
 
   phone: string
 
-  password: string
+  // Sin `password`: el alta no la pide (la persona la define al activar la
+  // cuenta desde el correo de invitación) y al editar nunca se mandó.
 
   /**
    * `pk_tarchivo` de la foto de perfil ya guardada — `undefined`/`null` si
@@ -49,10 +50,8 @@ export interface Person {
    * puntual), pero el autocompletado solo confirma que existe la CUENTA
    * (`TUSUARIO`) — no hay forma de saber, solo con el documento, cuál
    * `TFUNCIONARIO` (si alguno) le corresponde a este establecimiento en
-   * particular. Se usa exclusivamente para bloquear/eximir el campo de
-   * contraseña en el formulario (ver `UserDetailsForm`): al guardar, el
-   * backend igual reconoce y reutiliza la cuenta por documento/correo, así
-   * que no hace falta (ni tiene sentido) pedir una contraseña nueva.
+   * particular. Al guardar, el backend reconoce y reutiliza la cuenta por
+   * documento/correo en vez de crear una nueva.
    */
   accountExists?: boolean
 }
@@ -70,7 +69,7 @@ export interface Person {
  *
  * Solo compara los campos que vive en `TUSUARIO` y que el form deja
  * editar tras el autocompletado (documento/tipo son la clave del match,
- * no se comparan; `password` es decorativo mientras `accountExists`).
+ * no se comparan).
  */
 export function personDataChangedSinceMatch(original: Partial<Person>, current: Person): boolean {
   const sameText = (a?: string | null, b?: string | null) => (a ?? "").trim() === (b ?? "").trim()

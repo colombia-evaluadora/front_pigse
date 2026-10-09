@@ -17,7 +17,6 @@ function createPerson(overrides: Partial<Person> = {}): Person {
     gender: { id: 1, code: "M", name: "Masculino" },
     email: "person@example.com",
     phone: "3000000000",
-    password: "12345678",
     ...overrides,
   }
 }
@@ -37,7 +36,6 @@ function createEmptyPerson(): Person {
     gender: null,
     email: "",
     phone: "",
-    password: "",
   }
 }
 
@@ -98,16 +96,11 @@ function createValues(overrides: Partial<EstablishmentDetails> = {}): Establishm
   }
 }
 
-const defaultConfirmPasswords = {
-  principal: "",
-  secretary: "",
-}
-
 describe("validateEstablishmentForm", () => {
   it("rechaza un establecimiento sin rector: es obligatorio (a diferencia de la secretaria)", () => {
     const values = createValues()
 
-    const { errors, invalidFields } = validateEstablishmentForm(values, defaultConfirmPasswords)
+    const { errors, invalidFields } = validateEstablishmentForm(values)
 
     expect(errors).toContain("Rector: tipo de documento")
     expect(invalidFields).toContain("principal.documentType")
@@ -118,7 +111,7 @@ describe("validateEstablishmentForm", () => {
       principal: createPerson(),
     })
 
-    const { errors } = validateEstablishmentForm(values, defaultConfirmPasswords)
+    const { errors } = validateEstablishmentForm(values)
 
     expect(errors).toEqual([])
   })
@@ -133,7 +126,7 @@ describe("validateEstablishmentForm", () => {
       },
     })
 
-    const { errors } = validateEstablishmentForm(values, defaultConfirmPasswords)
+    const { errors } = validateEstablishmentForm(values)
 
     expect(errors).toContain("Nombre del establecimiento")
   })
@@ -150,7 +143,7 @@ describe("validateEstablishmentForm", () => {
       }),
     })
 
-    const { errors, invalidFields } = validateEstablishmentForm(values, defaultConfirmPasswords)
+    const { errors, invalidFields } = validateEstablishmentForm(values)
 
     expect(errors).toContain("Rector: número de documento")
     expect(invalidFields).toContain("principal.identification")
@@ -162,7 +155,6 @@ describe("validateEstablishmentForm", () => {
         birthDate: "",
         email: "",
         phone: "",
-        password: "",
         gender: null,
         middleName: "",
         secondLastName: "",
@@ -174,55 +166,35 @@ describe("validateEstablishmentForm", () => {
         birthDate: "",
         email: "",
         phone: "",
-        password: "",
         gender: null,
         middleName: "",
         secondLastName: "",
       }),
     })
 
-    const { errors, invalidFields } = validateEstablishmentForm(values, {
-      principal: "",
-      secretary: "",
-    })
+    const { errors, invalidFields } = validateEstablishmentForm(values)
 
     expect(errors).toEqual([])
     expect(invalidFields).toEqual([])
   })
 
-  it("rechaza contraseñas no coincidentes sólo si alguna fue escrita", () => {
+  it("exige correo (no contraseña) al dar de alta un rector nuevo: la activación llega por correo", () => {
     const values = createValues({
-      principal: createPerson({
-        password: "12345678",
-      }),
-    })
-
-    const { errors } = validateEstablishmentForm(values, {
-      principal: "87654321",
-      secretary: "",
-    })
-
-    expect(errors).toContain("Rector: las contraseñas no coinciden")
-  })
-
-  it("no exige contraseñas si ninguno de los dos campos está lleno", () => {
-    const values = createValues({
-      principal: createPerson({ password: "" }),
+      principal: createPerson({ id: undefined, email: "" }),
       secretary: createEmptyPerson(),
     })
 
-    const { errors } = validateEstablishmentForm(values, {
-      principal: "",
-      secretary: "",
-    })
+    const { errors, invalidFields } = validateEstablishmentForm(values)
 
-    expect(errors).not.toContain("contraseña")
+    expect(errors).toContain("Rector: correo electrónico")
+    expect(invalidFields).not.toContain("principal.password")
+    expect(invalidFields).not.toContain("principal.confirmPassword")
   })
 
   it("permite campos opcionales del establecimiento vacíos (contacto, complementaria)", () => {
     const values = createValues()
 
-    const { errors } = validateEstablishmentForm(values, defaultConfirmPasswords)
+    const { errors } = validateEstablishmentForm(values)
 
     expect(errors).not.toContain("Correo electrónico")
     expect(errors).not.toContain("Teléfono")
