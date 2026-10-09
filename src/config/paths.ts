@@ -121,6 +121,18 @@ export const paths = {
       getHref: () => "/app/monitoreo-cumplimiento",
     },
     /**
+     * Detalle documental de un establecimiento para un tipo (anexos y
+     * archivos, V555.1). Cuelga de `monitoreo-cumplimiento/detalle/...` y no
+     * de `monitoreo-cumplimiento/$id`: un param suelto junto al tablero se
+     * tragaría cualquier segmento estático que se agregue después. Al estar
+     * bajo la URL del menú, el guard de rutas lo habilita sin regla extra.
+     */
+    monitoreoCumplimientoDetalle: {
+      path: "monitoreo-cumplimiento/detalle/$establecimientoId/$tipo",
+      getHref: (establecimientoId: number | string, tipo: string) =>
+        `/app/monitoreo-cumplimiento/detalle/${establecimientoId}/${tipo}`,
+    },
+    /**
      * Visor de PDF: la página a la que lleva el botón "Consultar" tanto de
      * la vista institucional como del tablero de monitoreo. El tipo
      * (`PEI` / `PEC` / `PMI`) viaja en la URL como segmento, no como

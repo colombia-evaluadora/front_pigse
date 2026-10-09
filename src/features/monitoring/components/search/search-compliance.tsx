@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 
 import { SearchQueryBar } from "@/components/search/search-query-bar"
-import { optionsTerm, type QueryOption, type QuerySyntax } from "@/components/search/query-syntax"
+import { optionTerm, optionsTerm, type QueryOption, type QuerySyntax } from "@/components/search/query-syntax"
 import { useQuerySearch } from "@/components/search/use-query-search"
 import { Field, FieldLabel } from "@/components/ui/field"
 import {
@@ -14,25 +14,24 @@ import {
 import { toSelectItemsMap } from "@/lib/catalog-options"
 
 import type { ComplianceFilters } from "@/features/monitoring/api/types/compliance"
+import {
+  ESTADO_FILTER_OPTIONS,
+  ETNIAS_FILTER_OPTIONS,
+  PLAZO_FILTER_OPTIONS,
+} from "@/features/monitoring/api/ui-mappings"
 
 // El `htmlFor` de la etiqueta necesita un id estable en el control.
 const SEARCH_INPUT_ID = "compliance-search"
 
 /**
- * Estados posibles de un documento en el tablero.
- *
- * Van hardcodeados y no salen de un catálogo del backend porque no son un
- * catálogo: los produce el `CASE` de `fn_pigse_cumplimiento_listar()`, que es
- * código, no datos. Si alguna vez se agrega un cuarto estado hay que tocar
- * esta lista igual que el `switch` de `ui-mappings.ts`.
+ * Estados por tipo: el `status` clásico más el `estado` derivado de V523
+ * (Parcial / Sin cargar). El backend compara contra ambos (V524).
  */
-const ESTADO_OPTIONS: QueryOption[] = [
-  { value: "COMPLETO", label: "Completo" },
-  { value: "PENDIENTE", label: "Pendiente" },
-  { value: "NO_APLICA", label: "No aplica" },
-]
+const ESTADO_OPTIONS: QueryOption[] = ESTADO_FILTER_OPTIONS
+const PLAZO_OPTIONS: QueryOption[] = PLAZO_FILTER_OPTIONS
+const ETNIAS_OPTIONS: QueryOption[] = ETNIAS_FILTER_OPTIONS
 
-const TODOS_ITEMS = [{ value: "", label: "Todos" }, ...ESTADO_OPTIONS]
+const withTodos = (options: QueryOption[]) => [{ value: "", label: "Todos" }, ...options]
 
 interface SearchComplianceProps {
   filters: ComplianceFilters
@@ -63,16 +62,20 @@ export function SearchCompliance({
   const [draftPec, setDraftPec] = useState(filters.pec[0] ?? "")
   const [draftPmi, setDraftPmi] = useState(filters.pmi[0] ?? "")
   const [draftPfi, setDraftPfi] = useState(filters.pfi[0] ?? "")
+  const [draftPlazo, setDraftPlazo] = useState(filters.plazo[0] ?? "")
+  const [draftEtnias, setDraftEtnias] = useState(filters.etnias)
 
   const syntax = useMemo<QuerySyntax<ComplianceFilters>>(
     () => ({
-      empty: { search: "", pei: [], pec: [], pmi: [], pfi: [] },
+      empty: { search: "", pei: [], pec: [], pmi: [], pfi: [], plazo: [], etnias: "" },
       freeText: { key: "texto", field: "search" },
       terms: [
         optionsTerm("pei", "pei", ESTADO_OPTIONS),
         optionsTerm("pec", "pec", ESTADO_OPTIONS),
         optionsTerm("pmi", "pmi", ESTADO_OPTIONS),
         optionsTerm("pfi", "pfi", ESTADO_OPTIONS),
+        optionsTerm("plazo", "plazo", PLAZO_OPTIONS),
+        optionTerm("tipo", "etnias", ETNIAS_OPTIONS),
       ],
     }),
     [],
@@ -92,7 +95,9 @@ export function SearchCompliance({
     setDraftPec(filters.pec[0] ?? "")
     setDraftPmi(filters.pmi[0] ?? "")
     setDraftPfi(filters.pfi[0] ?? "")
-  }, [open, filters.pei, filters.pec, filters.pmi, filters.pfi])
+    setDraftPlazo(filters.plazo[0] ?? "")
+    setDraftEtnias(filters.etnias)
+  }, [open, filters.pei, filters.pec, filters.pmi, filters.pfi, filters.plazo, filters.etnias])
 
   function handleApplyAdvanced() {
     // El popover no toca la búsqueda libre: reescribe el resto de la consulta
@@ -104,6 +109,8 @@ export function SearchCompliance({
       pec: draftPec ? [draftPec] : [],
       pmi: draftPmi ? [draftPmi] : [],
       pfi: draftPfi ? [draftPfi] : [],
+      plazo: draftPlazo ? [draftPlazo] : [],
+      etnias: draftEtnias,
     })
     setOpen(false)
   }
@@ -118,7 +125,7 @@ export function SearchCompliance({
     <div className="flex min-w-0 flex-1 flex-col gap-2">
       <SearchQueryBar
         id={SEARCH_INPUT_ID}
-        placeholder="Buscar por"
+        placeholder="Buscar establecimiento, código DANE o municipio"
         value={search}
         onValueChange={setSearch}
         onClearAll={handleClearAll}
@@ -129,30 +136,48 @@ export function SearchCompliance({
         onApply={handleApplyAdvanced}
         size="sm"
       >
-        <div className="grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 px-4 sm:grid-cols-2">
+          <EstadoField
+            id="compliance-plazo"
+            label="Plazo"
+            value={draftPlazo}
+            onChange={setDraftPlazo}
+            options={PLAZO_OPTIONS}
+          />
+          <EstadoField
+            id="compliance-etnias"
+            label="Tipo de establecimiento"
+            value={draftEtnias}
+            onChange={setDraftEtnias}
+            options={ETNIAS_OPTIONS}
+          />
           <EstadoField
             id="compliance-pei"
             label="Estado PEI"
             value={draftPei}
             onChange={setDraftPei}
+            options={ESTADO_OPTIONS}
           />
           <EstadoField
             id="compliance-pec"
             label="Estado PEC"
             value={draftPec}
             onChange={setDraftPec}
+            options={ESTADO_OPTIONS}
           />
           <EstadoField
             id="compliance-pmi"
             label="Estado PMI"
             value={draftPmi}
             onChange={setDraftPmi}
+            options={ESTADO_OPTIONS}
           />
           <EstadoField
             id="compliance-pfi"
             label="Estado PFI"
             value={draftPfi}
             onChange={setDraftPfi}
+            options={ESTADO_OPTIONS}
           />
         </div>
       </SearchQueryBar>
@@ -160,23 +185,26 @@ export function SearchCompliance({
   )
 }
 
-/** Los cuatro selectores son idénticos salvo la etiqueta: se arman una vez. */
+/** Los selectores son idénticos salvo etiqueta y opciones: se arman una vez. */
 function EstadoField({
   id,
   label,
   value,
   onChange,
+  options,
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
+  options: QueryOption[]
 }) {
+  const items = withTodos(options)
   return (
     <Field orientation="vertical" variant="outlined" className="gap-2">
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <ComboboxField
-        items={toSelectItemsMap(TODOS_ITEMS)}
+        items={toSelectItemsMap(items)}
         value={value}
         onValueChange={(next) => onChange(next ?? "")}
       >
@@ -184,7 +212,7 @@ function EstadoField({
           <ComboboxFieldValue placeholder="Todos" />
         </ComboboxFieldTrigger>
         <ComboboxFieldContent>
-          {TODOS_ITEMS.map((item) => (
+          {items.map((item) => (
             <ComboboxFieldItem key={item.value} value={item.value}>
               {item.label}
             </ComboboxFieldItem>
