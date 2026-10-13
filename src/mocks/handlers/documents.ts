@@ -5,13 +5,12 @@ import { complianceFilesById } from "@/mocks/db/compliance"
 import {
   documentsDb,
   documentCategoriesDb,
-  findDocumentCategory,
-  findDocumentCategoryByArchivo,
   listDocumentCategories,
-  uploadDocumentCategoryVersion,
-  deleteDocumentCategoryVersion,
+  stageDocumentFile,
+  saveDocumentAnnexesBatch,
 } from "@/mocks/db/documents"
 import {
+  documentDeadlineError,
   getDocumentDeadline,
   setDocumentDeadline,
   saveDocumentDeadlineException,
@@ -25,7 +24,6 @@ import {
 } from "@/features/document-management/api/types/document"
 import type {
   DocumentCategoryCode,
-  DocumentCategoryMutationResult,
   DocumentType,
 } from "@/features/document-management/api/types/document"
 
@@ -121,7 +119,9 @@ function buildMockPdf(texto: string): string {
  * categorías) — los handlers de archivo no necesitan saber de cuál, solo
  * el `fileName` para armar el PDF de prueba.
  */
-function findFileByArchivoId(archivoId: string | undefined): { fileName: string | null } | undefined {
+function findFileByArchivoId(
+  archivoId: string | undefined,
+): { fileName: string | null } | undefined {
   return (
     documentsDb.find((d) => String(d.archivoId) === String(archivoId)) ??
     documentCategoriesDb.find((c) => String(c.archivoId) === String(archivoId)) ??
@@ -213,71 +213,49 @@ export const documentHandlers = [
   }),
 
   /**
-   * Carga (o reemplaza) la versión vigente de un documento. Devuelve el
-   * `Document` ya actualizado.
+   * Paso 1 del guardado "todo o nada" (V555.5): sube UN archivo de un anexo
+   * SIN enlazarlo (`fn_documento_archivo_preparar`). Mismas validaciones de
+   * tipo/categoría y fecha límite que el backend real.
+   *
+   * OJO con la ruta: el front antepone `/files` (file-service se pone en el
+   * medio en el backend real), así que la URL es `/api/files/documents/files`.
    */
-  // OJO con la ruta: `postMultipart` (lib/files.ts) antepone `/files` porque
-  // en el backend real el file-service se pone en el medio para subir el
-  // binario a S3 y registrarlo en TARCHIVO antes de reenviar al
-  // query-service. Entonces la URL que sale del front es
-  // `/api/files/documents/upload`, NO `/api/documents/upload` — con la
-  // máscara sin `/files` el handler no matchea, MSW deja pasar el request
-  // al proxy y la carga muere con un 401 del gateway real.
-  http.post("*/api/files/documents/upload", async ({ request }) => {
-    await delay(450)
+  http.post("*/api/files/documents/files", async ({ request }) => {
+    await delay(600)
 
     const { tipo, archivo, categoria } = await readUploadBody(request)
 
     if (!tipo || !isDocumentType(tipo)) {
       return HttpResponse.json(
-        { status: "error", message: "Debe indicar el tipo de documento (PEI, PEC, PMI o PFI)." },
+        { message: "Debe indicar el tipo de documento (PEI, PEC, PMI o PFI)." },
         { status: 400 },
       )
     }
-
-    if (!archivo) {
+    if (!archivo || archivo.size === 0) {
+      return HttpResponse.json({ message: "Debe adjuntar un archivo no vacío." }, { status: 400 })
+    }
+    if (
+      !categoria ||
+      !isDocumentCategoryCode(categoria) ||
+      !documentCategoriesForType(tipo).includes(categoria)
+    ) {
       return HttpResponse.json(
-        { status: "error", message: "Debe adjuntar el archivo del documento." },
+        { message: `${tipo} no admite la categoría ${categoria ?? "(vacía)"}.` },
         { status: 400 },
       )
     }
-
-    if (archivo.size === 0) {
-      return HttpResponse.json(
-        { status: "error", message: "El archivo adjunto está vacío." },
-        { status: 400 },
-      )
+    const deadlineError = documentDeadlineError()
+    if (deadlineError) {
+      return HttpResponse.json({ message: deadlineError }, { status: 409 })
+    }
+    // Para probar el fallo parcial: un archivo cuyo nombre contenga
+    // "falla" se rechaza como lo haría file-service con un archivo dañado.
+    if (archivo.name.toLowerCase().includes("falla")) {
+      return HttpResponse.json({ message: "El archivo no se pudo procesar." }, { status: 400 })
     }
 
-    // V521: los 4 tipos exigen categoría -- mismas validaciones que
-    // `fn_documento_guardar`.
-    if (!categoria || !isDocumentCategoryCode(categoria)) {
-      return HttpResponse.json(
-        { status: "error", message: `Debe indicar la categoría del anexo de ${tipo}.` },
-        { status: 400 },
-      )
-    }
-    if (!documentCategoriesForType(tipo).includes(categoria)) {
-      return HttpResponse.json(
-        { status: "error", message: `${tipo} no admite la categoría ${categoria}.` },
-        { status: 400 },
-      )
-    }
-
-    const document = uploadDocumentCategoryVersion({
-      type: tipo,
-      categoria,
-      fileName: archivo.name,
-      sizeBytes: archivo.size,
-    })
-
-    return HttpResponse.json<DocumentCategoryMutationResult>({
-      status: "ok",
-      message: "Anexo cargado correctamente.",
-      document,
-    })
+    return HttpResponse.json(stageDocumentFile({ fileName: archivo.name, sizeBytes: archivo.size }))
   }),
-
   /**
    * Anexos de un tipo puntual (V521: los 4 tipos van por categorías) —
    * las categorías fijas que le corresponden (5 para PEI/PEC, 1 para
@@ -295,76 +273,37 @@ export const documentHandlers = [
   }),
 
   /**
-   * Elimina UN anexo. Baja lógica, el archivo pasa al historial. "Plan de
-   * estudios" (V515, solo PEI/PEC) exige `ARCHIVOID` en el body -- admite
-   * varios archivos, hay que decir cuál.
+   * Paso 2 (V555.5, `fn_documento_guardar_lote`): enlaza TODOS los anexos de
+   * un documento a la vez. Rechaza sin escribir nada si al terminar falta un
+   * anexo obligatorio, igual que el backend real.
    */
-  http.patch("*/api/documents/:type/categories/:categoria", async ({ params, request }) => {
-    await delay(250)
+  http.put("*/api/documents/:type/annexes", async ({ params, request }) => {
+    await delay(400)
 
     const typeParam = Array.isArray(params.type) ? params.type[0] : params.type
-    const categoriaParam = Array.isArray(params.categoria) ? params.categoria[0] : params.categoria
-
     if (!typeParam || !isDocumentType(typeParam)) {
-      return HttpResponse.json(
-        { status: "error", message: "Tipo de documento inválido." },
-        { status: 400 },
-      )
+      return HttpResponse.json({ message: "Tipo de documento inválido." }, { status: 400 })
     }
-    if (!categoriaParam || !isDocumentCategoryCode(categoriaParam)) {
-      return HttpResponse.json(
-        { status: "error", message: "Categoría inválida." },
-        { status: 400 },
-      )
+    const deadlineError = documentDeadlineError()
+    if (deadlineError) {
+      return HttpResponse.json({ message: deadlineError }, { status: 409 })
     }
 
-    const body = (await request.json().catch(() => null)) as { ARCHIVOID?: number | null } | null
-    const archivoId = body?.ARCHIVOID ?? null
+    const body = (await request.json().catch(() => null)) as {
+      ANEXOS?: { categoria: string; archivoId: number }[]
+      QUITAR?: number[]
+    } | null
 
-    if (categoriaParam === "PLAN_ESTUDIOS") {
-      if (archivoId == null) {
-        return HttpResponse.json(
-          { status: "error", message: "Plan de estudios admite varios archivos -- indique cuál." },
-          { status: 400 },
-        )
-      }
-      const existing = findDocumentCategoryByArchivo(typeParam, categoriaParam, archivoId)
-      if (!existing) {
-        return HttpResponse.json(
-          { status: "error", message: "Archivo no encontrado en Plan de estudios." },
-          { status: 404 },
-        )
-      }
-      const document = deleteDocumentCategoryVersion(typeParam, categoriaParam, archivoId)
-      return HttpResponse.json<DocumentCategoryMutationResult>({
-        status: "ok",
-        message: "Anexo eliminado.",
-        document: document!,
-      })
-    }
-
-    const existing = findDocumentCategory(typeParam, categoriaParam)
-    if (!existing || existing.status === "PENDIENTE") {
-      return HttpResponse.json(
-        { status: "error", message: "El anexo no tiene una versión vigente para eliminar." },
-        { status: 404 },
-      )
-    }
-
-    const document = deleteDocumentCategoryVersion(typeParam, categoriaParam)
-    if (!document) {
-      return HttpResponse.json(
-        { status: "error", message: "No se pudo eliminar el anexo." },
-        { status: 500 },
-      )
-    }
-    return HttpResponse.json<DocumentCategoryMutationResult>({
-      status: "ok",
-      message: "Anexo eliminado.",
-      document,
+    const result = saveDocumentAnnexesBatch({
+      type: typeParam,
+      anexos: body?.ANEXOS ?? [],
+      quitar: body?.QUITAR ?? [],
     })
+    if ("error" in result) {
+      return HttpResponse.json({ message: result.error }, { status: result.status })
+    }
+    return HttpResponse.json(result.rows)
   }),
-
   /**
    * Fecha límite global + excepciones activas (V522).
    */

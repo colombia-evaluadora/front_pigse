@@ -209,13 +209,6 @@ export interface DocumentCategory {
   downloadUrl: string | null
 }
 
-/** Forma común de respuesta para las mutaciones de un anexo (upload/delete). */
-export interface DocumentCategoryMutationResult {
-  status: "ok" | "error"
-  message: string
-  document: DocumentCategory
-}
-
 /**
  * Etiqueta legible del tipo de documento para usar en headers y
  * breadcrumbs. Es la misma que arma el backend (`fn_documento_nombre`)
