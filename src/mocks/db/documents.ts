@@ -175,7 +175,9 @@ export const documentCategoriesDb: DocumentCategory[] = [
  */
 function recalcDocumentProgress(type: DocumentType): void {
   const requeridas = requiredDocumentCategoriesForType(type)
-  const rows = documentCategoriesDb.filter((c) => c.type === type && requeridas.includes(c.categoria))
+  const rows = documentCategoriesDb.filter(
+    (c) => c.type === type && requeridas.includes(c.categoria),
+  )
   const completadas = new Set(rows.filter((c) => c.fileName !== null).map((c) => c.categoria))
   const document = documentsDb.find((d) => d.type === type)
   if (!document || document.status === "NO_APLICA") return
@@ -188,28 +190,6 @@ recalcDocumentProgress("PMI")
 
 export function findDocumentByType(type: DocumentType): Document | undefined {
   return documentsDb.find((document) => document.type === type)
-}
-
-/**
- * Fila ÚNICA de una categoría de un solo archivo (nunca "Plan de estudios",
- * que puede tener varias -- ahí hay que buscar por `archivoId` puntual, no
- * por `type`+`categoria`).
- */
-export function findDocumentCategory(
-  type: DocumentType,
-  categoria: DocumentCategoryCode,
-): DocumentCategory | undefined {
-  return documentCategoriesDb.find((c) => c.type === type && c.categoria === categoria)
-}
-
-export function findDocumentCategoryByArchivo(
-  type: DocumentType,
-  categoria: DocumentCategoryCode,
-  archivoId: number,
-): DocumentCategory | undefined {
-  return documentCategoriesDb.find(
-    (c) => c.type === type && c.categoria === categoria && c.archivoId === archivoId,
-  )
 }
 
 /**
@@ -245,115 +225,116 @@ export function listDocumentCategories(type: DocumentType): DocumentCategory[] {
 }
 
 /**
- * Carga (o reemplaza) el archivo de UN anexo. "Plan de estudios" (V515,
- * solo PEI/PEC) SIEMPRE agrega una fila nueva (nunca reemplaza -- admite
- * varios archivos a la vez); las demás categorías (incluida la única de
- * PMI/PFI) siguen reemplazando la única fila vigente.
+ * Archivos subidos (paso 1 del guardado "todo o nada", V555.5) que todavía
+ * no cuelgan de ningún anexo. Igual que `pigse.tarchivo` en el backend real:
+ * existen, pero el documento no cambia hasta el paso 2.
  */
-export function uploadDocumentCategoryVersion(params: {
-  type: DocumentType
-  categoria: DocumentCategoryCode
+const stagedFiles = new Map<number, { fileName: string; sizeBytes: number }>()
+
+export function stageDocumentFile(params: { fileName: string; sizeBytes: number }): {
+  archivoId: number
   fileName: string
   sizeBytes: number
-}): DocumentCategory {
-  const uploadedAt = new Date().toISOString()
+} {
   const archivoId = nextArchivoId()
-  const typeName =
-    documentCategoriesDb.find((c) => c.type === params.type)?.typeName ??
-    DOCUMENT_TYPES.find((t) => t.id === params.type)?.name ??
-    params.type
+  stagedFiles.set(archivoId, params)
+  return { archivoId, ...params }
+}
 
-  if (params.categoria === "PLAN_ESTUDIOS") {
-    const next: DocumentCategory = {
-      id: String(archivoId),
-      type: params.type,
-      typeName,
-      categoria: params.categoria,
-      categoriaName: documentCategoryDisplayName(params.categoria),
-      status: "COMPLETO",
-      fileName: params.fileName,
-      uploadedAt,
-      sizeBytes: params.sizeBytes,
-      archivoId,
-      downloadUrl: `/api/files/download/${archivoId}`,
-    }
-    documentCategoriesDb.push(next)
-    recalcDocumentProgress(params.type)
-    return next
-  }
-
-  const existing = findDocumentCategory(params.type, params.categoria)
-  const next: DocumentCategory = {
-    id: params.categoria,
-    type: params.type,
-    typeName: existing?.typeName ?? typeName,
-    categoria: params.categoria,
-    categoriaName: documentCategoryDisplayName(params.categoria),
-    status: "COMPLETO",
-    fileName: params.fileName,
-    uploadedAt,
-    sizeBytes: params.sizeBytes,
-    archivoId,
-    downloadUrl: `/api/files/download/${archivoId}`,
-  }
-
-  const index = documentCategoriesDb.findIndex(
-    (c) => c.type === params.type && c.categoria === params.categoria,
+/** Anexos obligatorios sin ningún archivo vigente (mismo criterio que `fn_documento_validar_completo`). */
+function missingRequiredCategories(
+  type: DocumentType,
+  rows: DocumentCategory[],
+): DocumentCategoryCode[] {
+  return requiredDocumentCategoriesForType(type).filter(
+    (categoria) =>
+      !rows.some((c) => c.type === type && c.categoria === categoria && c.archivoId != null),
   )
-  if (index >= 0) {
-    documentCategoriesDb[index] = next
-  } else {
-    documentCategoriesDb.push(next)
-  }
-
-  recalcDocumentProgress(params.type)
-  return next
 }
 
 /**
- * Da de baja un anexo. "Plan de estudios" (V515) identifica CUÁL de los
- * varios archivos por `archivoId` y lo saca de la lista del todo (no
- * "vuelve a PENDIENTE" como las categorías de un solo archivo -- deja de
- * existir esa fila puntual). Las demás categorías siguen limpiando la
- * única fila vigente.
+ * Paso 2 (`fn_documento_guardar_lote`): aplica bajas y anexos sobre una COPIA
+ * y solo la confirma si el documento queda completo — "todo o nada", igual que
+ * la transacción del backend real.
  */
-export function deleteDocumentCategoryVersion(
-  type: DocumentType,
-  categoria: DocumentCategoryCode,
-  archivoId?: number | null,
-): DocumentCategory | undefined {
-  if (categoria === "PLAN_ESTUDIOS") {
-    if (archivoId == null) return undefined
-    const existing = findDocumentCategoryByArchivo(type, categoria, archivoId)
-    if (!existing) return undefined
-
-    const index = documentCategoriesDb.findIndex(
-      (c) => c.type === type && c.categoria === categoria && c.archivoId === archivoId,
-    )
-    if (index >= 0) documentCategoriesDb.splice(index, 1)
-
-    recalcDocumentProgress(type)
-    return { ...existing, status: "PENDIENTE", fileName: null, archivoId: null, downloadUrl: null }
+export function saveDocumentAnnexesBatch(params: {
+  type: DocumentType
+  anexos: { categoria: string; archivoId: number }[]
+  quitar: number[]
+}): { rows: DocumentCategory[] } | { error: string; status: number } {
+  const { type } = params
+  if (params.anexos.length === 0 && params.quitar.length === 0) {
+    return { error: "No hay cambios para guardar.", status: 400 }
   }
 
-  const existing = findDocumentCategory(type, categoria)
-  if (!existing) return undefined
+  const draft = documentCategoriesDb.map((c) => ({ ...c }))
+  const uploadedAt = new Date().toISOString()
+  const typeName = DOCUMENT_TYPES.find((t) => t.id === type)?.name ?? type
 
-  const cleared: DocumentCategory = {
-    ...existing,
-    status: "PENDIENTE",
-    fileName: null,
-    uploadedAt: null,
-    sizeBytes: null,
-    archivoId: null,
-    downloadUrl: null,
+  for (const archivoId of params.quitar) {
+    const index = draft.findIndex((c) => c.type === type && c.archivoId === archivoId)
+    if (index < 0) {
+      return { error: `El archivo ${archivoId} no es un anexo vigente de ${type}.`, status: 404 }
+    }
+    if (draft[index].categoria === "PLAN_ESTUDIOS") {
+      draft.splice(index, 1)
+    } else {
+      draft[index] = {
+        ...draft[index],
+        status: "PENDIENTE",
+        fileName: null,
+        uploadedAt: null,
+        sizeBytes: null,
+        archivoId: null,
+        downloadUrl: null,
+      }
+    }
   }
 
-  const index = documentCategoriesDb.findIndex((c) => c.type === type && c.categoria === categoria)
-  if (index >= 0) {
-    documentCategoriesDb[index] = cleared
+  for (const anexo of params.anexos) {
+    const categoria = anexo.categoria as DocumentCategoryCode
+    if (!documentCategoriesForType(type).includes(categoria)) {
+      return { error: `${type} no admite la categoría ${anexo.categoria}.`, status: 400 }
+    }
+    const staged = stagedFiles.get(anexo.archivoId)
+    if (!staged) {
+      return {
+        error: `El archivo ${anexo.archivoId} no existe o ya está asociado a un documento.`,
+        status: 404,
+      }
+    }
+    const row: DocumentCategory = {
+      id: categoria === "PLAN_ESTUDIOS" ? String(anexo.archivoId) : categoria,
+      type,
+      typeName,
+      categoria,
+      categoriaName: documentCategoryDisplayName(categoria),
+      status: "COMPLETO",
+      fileName: staged.fileName,
+      uploadedAt,
+      sizeBytes: staged.sizeBytes,
+      archivoId: anexo.archivoId,
+      downloadUrl: `/api/files/download/${anexo.archivoId}`,
+    }
+    const index =
+      categoria === "PLAN_ESTUDIOS"
+        ? -1
+        : draft.findIndex((c) => c.type === type && c.categoria === categoria)
+    if (index >= 0) draft[index] = row
+    else draft.push(row)
   }
 
+  const missing = missingRequiredCategories(type, draft)
+  if (missing.length > 0) {
+    const names = missing.map((c) => documentCategoryDisplayName(c)).join(", ")
+    return {
+      error: `Faltan ${missing.length} anexo(s) obligatorio(s) de ${type}: ${names}.`,
+      status: 409,
+    }
+  }
+
+  for (const anexo of params.anexos) stagedFiles.delete(anexo.archivoId)
+  documentCategoriesDb.splice(0, documentCategoriesDb.length, ...draft)
   recalcDocumentProgress(type)
-  return cleared
+  return { rows: listDocumentCategories(type) }
 }
