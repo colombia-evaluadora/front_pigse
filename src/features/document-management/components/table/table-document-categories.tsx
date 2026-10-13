@@ -1,5 +1,6 @@
 "use no memo"
 
+import { useState } from "react"
 import { Link } from "@tanstack/react-router"
 
 import {
@@ -12,23 +13,21 @@ import {
 } from "@/components/layout/table-screen"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
-import { ArrowLeftIcon } from "@/components/ui/icons"
+import { ArrowLeftIcon, FileUploadOutlinedIcon, PencilIcon } from "@/components/ui/icons"
 import { useDataTable } from "@/hooks/use-data-table"
 import { paths } from "@/config/paths"
 import { useUser } from "@/lib/auth"
 import { canWriteDocuments } from "@/lib/auth-routes"
 
 import { useDocumentCategoriesQuery } from "@/features/document-management/api/query/use-document-categories"
-import {
-  documentCategoryColumns,
-  documentCategoryReadOnlyColumns,
-} from "@/features/document-management/components/table/columns-document-categories"
-import { UploadDocumentCategoryDialog } from "@/features/document-management/components/dialogs/dialog-upload-document-category"
+import { documentCategoryColumns } from "@/features/document-management/components/table/columns-document-categories"
+import { DocumentFormDialog } from "@/features/document-management/components/dialogs/dialog-document-form"
+import { missingAnnexesMessage } from "@/features/document-management/lib/document-file"
 import {
   documentTypeDisplayName,
-  documentCategoryDisplayName,
+  requiredDocumentCategoriesForType,
 } from "@/features/document-management/api/types/document"
-import type { DocumentCategory, DocumentType } from "@/features/document-management/api/types/document"
+import type { DocumentType } from "@/features/document-management/api/types/document"
 import { getErrorMessage } from "@/lib/api-client"
 
 interface DocumentCategoriesTableProps {
@@ -41,42 +40,30 @@ interface DocumentCategoriesTableProps {
  * viene de la URL (`/gestion-documental/:tipo`, ver `paths.ts`).
  */
 export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) {
-  const { data: categories = [], isPending, isError, error, refetch } = useDocumentCategoriesQuery(type)
+  const {
+    data: categories = [],
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useDocumentCategoriesQuery(type)
   const userQuery = useUser()
   const isReadOnly = !canWriteDocuments(userQuery.data)
 
-  // "Plan de estudios" (V515) es EXCLUSIVA de PEI/PEC -- PMI/PFI solo
-  // tienen su plan + "Autoevaluación institucional" (V521), que siguen el patrón de
-  // un archivo por categoría (Subir/Eliminar resuelve en
-  // `columns-document-categories.tsx`, no acá).
-  const tienePlanEstudios = type === "PEI" || type === "PEC"
+  const [formOpen, setFormOpen] = useState(false)
 
-  // "Plan de estudios" (V515) admite varios archivos a la vez: a diferencia
-  // de las otras 4 categorías, nunca deja de ofrecer "Agregar" solo porque
-  // ya tenga uno cargado — por eso este botón vive afuera de la tabla
-  // (la fila de acción de cada categoría de un solo archivo sigue
-  // resolviendo Subir/Eliminar como siempre, ver `columns-document-categories.tsx`).
-  // Si el tipo no aplica para este EE (NO_APLICA), ninguna fila ofrece
-  // acción — ni esta.
-  const planEstudiosNoAplica = categories.some(
-    (c) => c.categoria === "PLAN_ESTUDIOS" && c.status === "NO_APLICA",
+  // Un tipo que no aplica a este EE (NO_APLICA) no ofrece carga.
+  const noAplica = categories.some((c) => c.status === "NO_APLICA")
+  const hasFiles = categories.some((c) => c.archivoId != null)
+  // Documentos parciales que quedaron de antes del guardado "todo o nada":
+  // se muestran tal cual; el próximo guardado obliga a completarlos.
+  const missing = requiredDocumentCategoriesForType(type).filter(
+    (categoria) => !categories.some((c) => c.categoria === categoria && c.archivoId != null),
   )
-  const planEstudiosAddTarget: DocumentCategory = {
-    id: "plan-estudios-agregar",
-    type,
-    typeName: documentTypeDisplayName(type),
-    categoria: "PLAN_ESTUDIOS",
-    categoriaName: documentCategoryDisplayName("PLAN_ESTUDIOS"),
-    status: "PENDIENTE",
-    fileName: null,
-    uploadedAt: null,
-    sizeBytes: null,
-    archivoId: null,
-    downloadUrl: null,
-  }
+  const canEdit = !isReadOnly && !noAplica && !isPending && !isError
 
   const { table } = useDataTable({
-    columns: isReadOnly ? documentCategoryReadOnlyColumns : documentCategoryColumns,
+    columns: documentCategoryColumns,
     data: categories,
     pageCount: 1,
     pageIndex: 0,
@@ -108,15 +95,30 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
         >
           {documentTypeDisplayName(type)}
         </TableScreenTitle>
-        {!isReadOnly && tienePlanEstudios && !planEstudiosNoAplica && (
+        {canEdit && (
           <TableScreenToolbar>
-            <span />
+            <p className="m-0! text-sm text-muted-foreground">
+              {missing.length > 0 && hasFiles
+                ? `Documento incompleto. ${missingAnnexesMessage(missing)}`
+                : missing.length > 0
+                  ? "Adjunte todos los anexos obligatorios y guarde el documento completo."
+                  : "Documento completo. Puede reemplazar anexos desde el formulario."}
+            </p>
             <TableScreenActions>
-              <UploadDocumentCategoryDialog
-                category={planEstudiosAddTarget}
-                triggerLabel="Agregar a Plan de estudios"
-                alwaysAdds
-              />
+              <Button
+                variant="fill"
+                color="primary"
+                size="sm"
+                type="button"
+                onClick={() => setFormOpen(true)}
+              >
+                {hasFiles ? (
+                  <PencilIcon data-icon="inline-start" />
+                ) : (
+                  <FileUploadOutlinedIcon data-icon="inline-start" />
+                )}
+                {hasFiles ? "Editar documento" : "Cargar documento"}
+              </Button>
             </TableScreenActions>
           </TableScreenToolbar>
         )}
@@ -132,6 +134,15 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
           errorMessage={error ? getErrorMessage(error) : undefined}
         />
       </TableScreenBody>
+
+      {canEdit && (
+        <DocumentFormDialog
+          type={type}
+          categories={categories}
+          open={formOpen}
+          onOpenChange={setFormOpen}
+        />
+      )}
     </TableScreen>
   )
 }

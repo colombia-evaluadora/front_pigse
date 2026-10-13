@@ -4,10 +4,7 @@ import { DataTableColumnHeader } from "@/components/data-table"
 
 import type { DocumentCategory } from "@/features/document-management/api/types/document"
 
-import { isDocumentActionable } from "@/features/document-management/api/ui-mappings"
 import { StatusIndicator } from "@/features/document-management/components/table/status-indicator"
-import { UploadDocumentCategoryDialog } from "@/features/document-management/components/dialogs/dialog-upload-document-category"
-import { DeleteDocumentCategoryDialog } from "@/features/document-management/components/dialogs/dialog-delete-document-category"
 import { CategoryFileActions } from "@/features/document-management/components/table/category-file-actions"
 
 const categoryColumn: ColumnDef<DocumentCategory> = {
@@ -37,41 +34,13 @@ const fileColumn: ColumnDef<DocumentCategory> = {
   enableSorting: false,
 }
 
-/** Mismo criterio "una sola acción según el estado" que `columns-documents.tsx`. */
-const actionColumn: ColumnDef<DocumentCategory> = {
-  id: "singleAction",
-  accessorKey: "status",
-  meta: { label: "Acción" },
-  header: ({ column }) => <DataTableColumnHeader column={column} title="Acción" />,
-  cell: ({ row }) => {
-    const category = row.original
-    if (!isDocumentActionable(category.status)) return null
-
-    const isPending = category.status === "PENDIENTE"
-    return (
-      <div className="flex items-center justify-end">
-        {isPending ? (
-          <UploadDocumentCategoryDialog category={category} />
-        ) : (
-          <DeleteDocumentCategoryDialog category={category} />
-        )}
-      </div>
-    )
-  },
-  enableSorting: false,
-  enableHiding: false,
-  size: 160,
-}
-
+/**
+ * Sin columna de acción por fila: un anexo ya no se carga ni se elimina suelto
+ * (V555.x, guardado "todo o nada"). La carga y la edición viven en el
+ * formulario del documento completo (`DocumentFormDialog`), que abre el botón
+ * de la cabecera de la tabla.
+ */
 export const documentCategoryColumns: ColumnDef<DocumentCategory>[] = [
-  categoryColumn,
-  statusColumn,
-  fileColumn,
-  actionColumn,
-]
-
-/** Vista de solo lectura (Rector, o fiscalización): sin columna de acción. */
-export const documentCategoryReadOnlyColumns: ColumnDef<DocumentCategory>[] = [
   categoryColumn,
   statusColumn,
   fileColumn,
