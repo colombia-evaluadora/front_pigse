@@ -40,3 +40,15 @@ export function deleteDocumentDeadlineException(establecimientoId: number): bool
   state.excepciones.splice(index, 1)
   return true
 }
+
+/**
+ * Mismo gate que `fn_documento_validar_fecha_limite` (V555.2), solo con la
+ * fecha global: el mock no sabe a qué establecimiento pertenece el usuario.
+ */
+export function documentDeadlineError(): string | null {
+  if (!state.fechaLimite) return null
+  const today = new Date().toISOString().slice(0, 10)
+  return today > state.fechaLimite
+    ? `La fecha límite para Gestión Documental (${state.fechaLimite}) ya pasó.`
+    : null
+}

@@ -1,6 +1,9 @@
+import { useEffect } from "react"
+
 import { monitoreoCumplimientoRoute } from "@/router"
 
 import type { ComplianceFilters } from "@/features/monitoring/api/types/compliance"
+import { guardarUltimoFiltroTablero } from "@/features/monitoring/lib/ultimo-filtro-tablero"
 
 /** Vacío en la URL = `undefined`, para no dejar `?pei=` colgando. */
 const orUndefined = (values: string[]) => (values.length ? values : undefined)
@@ -13,6 +16,11 @@ const orUndefined = (values: string[]) => (values.length ? values : undefined)
 export function useComplianceFilters() {
   const search = monitoreoCumplimientoRoute.useSearch()
   const navigate = monitoreoCumplimientoRoute.useNavigate()
+
+  // "Volver" del detalle documental restaura este estado (ver ultimo-filtro-tablero).
+  useEffect(() => {
+    guardarUltimoFiltroTablero(search)
+  }, [search])
 
   const filters: ComplianceFilters = {
     search: search.search ?? "",

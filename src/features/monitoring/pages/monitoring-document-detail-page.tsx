@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Link, useCanGoBack, useRouter } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,7 @@ import {
   shortTypeName,
 } from "@/features/monitoring/api/ui-mappings"
 import { CategorySection } from "@/features/monitoring/components/detail/category-section"
+import { leerUltimoFiltroTablero } from "@/features/monitoring/lib/ultimo-filtro-tablero"
 
 /**
  * Detalle documental de un establecimiento para un tipo (PEI/PEC/PMI/PFI):
@@ -57,24 +58,20 @@ function MonitoringDocumentDetailContent() {
     type,
   )
 
-  const router = useRouter()
-  const canGoBack = useCanGoBack()
-
-  // "Volver" respeta el historial: el tablero guarda filtros y página en la
-  // URL, así que volver atrás deja la lista como estaba. Si se entró por un
-  // enlace directo no hay a dónde volver y se va al tablero limpio.
+  // "Volver" va SIEMPRE al tablero de Monitoreo, no un paso atrás en el
+  // historial: después de cambiar de pestaña (PEI/PMI) o de abrir el visor, el
+  // "atrás" del navegador caía en otra pantalla. Los filtros, el orden y la
+  // página del tablero se restauran desde el último estado guardado.
   const backButton = (
     <Button
       variant="outline"
       color="neutral"
       size="sm"
       type="button"
-      {...(canGoBack
-        ? { onClick: () => router.history.back() }
-        : {
-            render: <Link to={paths.app.monitoreoCumplimiento.getHref()} />,
-            nativeButton: false,
-          })}
+      render={
+        <Link to={paths.app.monitoreoCumplimiento.getHref()} search={leerUltimoFiltroTablero()} />
+      }
+      nativeButton={false}
     >
       <ArrowLeftIcon data-icon="inline-start" />
       Volver
