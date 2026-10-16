@@ -159,7 +159,7 @@ export function ResetPasswordEmailAction({
   const forgotPassword = useForgotPassword({
     mutationConfig: {
       onSuccess: () => {
-        notify(`Se envió el correo para restablecer la contraseña a ${correo}.`)
+        notify(`Correo enviado a ${correo}`)
       },
       onError: (error) => {
         notify(getErrorMessage(error), { variant: "error" })
@@ -209,11 +209,7 @@ export function ResendActivationEmailAction({ employee, estado }: ResendActivati
   const reenviar = useReenviarActivacion({
     mutationConfig: {
       onSuccess: () => {
-        notify(
-          isInvite
-            ? `Se envió la invitación a ${correo}.`
-            : `Se envió el correo de activación a ${correo}.`,
-        )
+        notify(`Correo enviado a ${correo}`)
       },
       onError: (error) => {
         notify(getErrorMessage(error), { variant: "error" })
