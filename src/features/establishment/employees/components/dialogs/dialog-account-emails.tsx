@@ -1,5 +1,4 @@
 import { useState, type ReactElement, type ReactNode } from "react"
-import { toast } from "sonner"
 
 import {
   AlertDialog,
@@ -15,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CheckIcon, EnvelopeIcon, KeyIcon, SpinnerIcon, XIcon } from "@/components/ui/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/overlay/tooltip"
+import { useNotify } from "@/components/notice/notice-context"
 import { getErrorMessage } from "@/lib/api-client"
 
 import { useForgotPassword } from "@/features/auth/api/mutations/forgot-password"
@@ -70,8 +70,8 @@ function ConfirmEmailAction({
       await onConfirm()
       setOpen(false)
     } catch {
-      // El error ya se avisó (toast) en `onError` de la mutación; el diálogo
-      // se cierra igual.
+      // El error ya se avisó en `onError` de la mutación; el diálogo se cierra
+      // igual para que el aviso de la página quede a la vista.
       setOpen(false)
     } finally {
       setPending(false)
@@ -124,25 +124,6 @@ function ConfirmEmailAction({
   )
 }
 
-/**
- * Aviso del resultado del envío. Va por toast de sonner (fijo en el
- * viewport) y NO por `notify()`: el `NoticeOutlet` de la pantalla vive en la
- * barra de herramientas, arriba de la tabla, y al disparar la acción desde
- * una fila con la página scrolleada el banner quedaba fuera de vista ("no
- * aparece nada"). El error es el mensaje del backend; el toast global de
- * axios está suprimido por el `NoticeProvider`, así que no se duplica.
- */
-function envioCallbacks(correo: string | undefined) {
-  return {
-    onSuccess: () => {
-      toast.success(`Correo enviado a ${correo}`)
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error))
-    },
-  }
-}
-
 const SIN_CORREO = "El funcionario no tiene correo registrado"
 
 /**
@@ -173,8 +154,18 @@ export function ResetPasswordEmailAction({
   /** `undefined` mientras carga; `"error"` si la consulta falló. */
   estado: EstadoCuenta | "error" | undefined
 }) {
+  const { notify } = useNotify()
   const correo = employee.email?.trim()
-  const forgotPassword = useForgotPassword({ mutationConfig: envioCallbacks(correo) })
+  const forgotPassword = useForgotPassword({
+    mutationConfig: {
+      onSuccess: () => {
+        notify(`Correo enviado a ${correo}`)
+      },
+      onError: (error) => {
+        notify(getErrorMessage(error), { variant: "error" })
+      },
+    },
+  })
 
   return (
     <ConfirmEmailAction
@@ -212,9 +203,19 @@ interface ResendActivationEmailActionProps {
  * backend crea la cuenta pendiente y envía la invitación.
  */
 export function ResendActivationEmailAction({ employee, estado }: ResendActivationEmailActionProps) {
+  const { notify } = useNotify()
   const correo = employee.email?.trim()
   const isInvite = estado === "NOT_FOUND"
-  const reenviar = useReenviarActivacion({ mutationConfig: envioCallbacks(correo) })
+  const reenviar = useReenviarActivacion({
+    mutationConfig: {
+      onSuccess: () => {
+        notify(`Correo enviado a ${correo}`)
+      },
+      onError: (error) => {
+        notify(getErrorMessage(error), { variant: "error" })
+      },
+    },
+  })
 
   let disabledReason: string | undefined
   if (!correo) disabledReason = SIN_CORREO

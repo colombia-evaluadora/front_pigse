@@ -94,12 +94,24 @@ export function NoticeBanner({
     return () => clearTimeout(timeout)
   }, [noticeId, autoCloseMs])
 
+  // Cada aviso nuevo se trae a la vista: el outlet de una pantalla de tabla
+  // vive arriba, en la barra de herramientas, y una acción disparada desde
+  // una fila con la página scrolleada dejaba el aviso fuera de vista (el
+  // usuario no veía ni el éxito ni el error). `block: "nearest"` no mueve
+  // nada si el banner ya está visible.
+  const bannerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (noticeId == null) return
+    bannerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }, [noticeId])
+
   if (!notice) return null
 
   const Icon = VARIANT_ICON[variant]
 
   return (
     <div
+      ref={bannerRef}
       role="status"
       className={cn(
         "flex items-center gap-3 rounded-md border px-4 py-1 text-sm font-medium",
