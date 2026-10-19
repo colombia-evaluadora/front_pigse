@@ -295,7 +295,7 @@ export function DocumentFormDialog({
                 ) : hasChanges ? (
                   <>
                     <CheckCircleFillIcon className="size-4 shrink-0 text-green" />
-                    Todos los anexos obligatorios tienen archivo.
+                    El documento principal y los anexos obligatorios tienen archivo.
                   </>
                 ) : (
                   "No hay cambios para guardar."

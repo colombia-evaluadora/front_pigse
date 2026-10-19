@@ -79,7 +79,7 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
     <TableScreen>
       <TableScreenHeader>
         <TableScreenTitle
-          description={`Anexos de ${documentTypeDisplayName(type).toLowerCase()}`}
+          description={`Documento principal y anexos del ${documentTypeDisplayName(type)}`}
           action={
             <Button
               variant="outline"
@@ -101,8 +101,8 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
               {missing.length > 0 && hasFiles
                 ? `Documento incompleto. ${missingAnnexesMessage(missing)}`
                 : missing.length > 0
-                  ? "Adjunte todos los anexos obligatorios y guarde el documento completo."
-                  : "Documento completo. Puede reemplazar anexos desde el formulario."}
+                  ? "Adjunte el documento principal y todos los anexos obligatorios, y guarde el documento completo."
+                  : "Documento completo. Puede reemplazar archivos desde el formulario."}
             </p>
             <TableScreenActions>
               <Button
@@ -130,7 +130,7 @@ export function DocumentCategoriesTable({ type }: DocumentCategoriesTableProps) 
           isPending={isPending}
           isError={isError}
           onRetry={refetch}
-          emptyMessage="No hay anexos configurados."
+          emptyMessage="No hay archivos configurados."
           errorMessage={error ? getErrorMessage(error) : undefined}
         />
       </TableScreenBody>
