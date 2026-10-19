@@ -10,8 +10,8 @@ import { CategoryFileActions } from "@/features/document-management/components/t
 const categoryColumn: ColumnDef<DocumentCategory> = {
   accessorKey: "categoriaName",
   id: "categoriaName",
-  meta: { label: "Anexo" },
-  header: ({ column }) => <DataTableColumnHeader column={column} title="Anexo" />,
+  meta: { label: "Documento o anexo" },
+  header: ({ column }) => <DataTableColumnHeader column={column} title="Documento o anexo" />,
   cell: ({ row }) => <span className="text-pretty font-medium">{row.original.categoriaName}</span>,
   enableSorting: false,
 }

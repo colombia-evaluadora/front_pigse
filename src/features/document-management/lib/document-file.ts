@@ -49,6 +49,6 @@ export function formatFileSize(bytes: number | null | undefined): string {
 export function missingAnnexesMessage(missing: readonly DocumentCategoryCode[]): string {
   const names = missing.map((categoria) => documentCategoryDisplayName(categoria)).join(", ")
   return missing.length === 1
-    ? `Falta 1 anexo obligatorio: ${names}.`
-    : `Faltan ${missing.length} anexos obligatorios: ${names}.`
+    ? `Falta 1 archivo obligatorio: ${names}.`
+    : `Faltan ${missing.length} archivos obligatorios: ${names}.`
 }
