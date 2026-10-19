@@ -200,7 +200,11 @@ export function findDocumentByType(type: DocumentType): Document | undefined {
  * no tienen "Plan de estudios" -- no aplica el placeholder.
  */
 export function listDocumentCategories(type: DocumentType): DocumentCategory[] {
-  const rows = documentCategoriesDb.filter((c) => c.type === type)
+  // Mismo orden que el backend real (V588): documento principal primero.
+  const orden = documentCategoriesForType(type)
+  const rows = documentCategoriesDb
+    .filter((c) => c.type === type)
+    .sort((a, b) => orden.indexOf(a.categoria) - orden.indexOf(b.categoria))
   if (type !== "PEI" && type !== "PEC") return rows
 
   const tienePlanEstudios = rows.some((c) => c.categoria === "PLAN_ESTUDIOS")

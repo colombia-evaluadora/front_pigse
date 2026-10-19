@@ -113,17 +113,24 @@ export interface Document {
   totalCategories?: number | null
 }
 
-/** Las 5 categorías fijas de un PEI/PEC (V512). Catálogo cerrado en código
- *  (no en uno de BD): pedido explícito, "fijo son esas 5". Si el día de
- *  mañana se agrega una, se agrega acá y en el `CHECK` del backend
- *  (`fn_documento_guardar`/`fn_documento_eliminar`). */
-const PEI_PEC_CATEGORIES = [
+/** Los 5 anexos fijos de un PEI/PEC (V512). Catálogo cerrado en código
+ *  (no en uno de BD). Si el día de mañana se agrega uno, se agrega acá y en
+ *  el `CHECK` del backend (`fn_documento_validar_categoria`). */
+const ANEXOS_PEI_PEC = [
   "PLAN_ESTUDIOS",
   "SIEE",
   "MANUAL_CONVIVENCIA",
   "PROYECTOS_TRANSVERSALES",
   "PLAN_GESTION_RIESGO",
 ] as const
+
+/** V588: PEI/PEC arrancan por su documento principal (el proyecto educativo
+ *  en sí). Hasta V587 solo existían los 5 anexos y no había dónde subir el
+ *  PEI/PEC propiamente dicho — PMI/PFI sí lo tenían (`PLAN_MEJORAMIENTO`/
+ *  `PLAN_FORTALECIMIENTO`). El código es propio de cada tipo (no uno
+ *  compartido) para que la etiqueta salga sin conocer el tipo. */
+const PEI_CATEGORIES = ["PROYECTO_EDUCATIVO_INSTITUCIONAL", ...ANEXOS_PEI_PEC] as const
+const PEC_CATEGORIES = ["PROYECTO_EDUCATIVO_COMUNITARIO", ...ANEXOS_PEI_PEC] as const
 
 /** PMI/PFI (V521): el plan propiamente dicho y su anexo obligatorio de
  *  autoevaluación. Antes había un solo hueco (la autoevaluación) y las
@@ -132,26 +139,31 @@ const PMI_CATEGORIES = ["PLAN_MEJORAMIENTO", "AUTOEVALUACION_INSTITUCIONAL"] as 
 const PFI_CATEGORIES = ["PLAN_FORTALECIMIENTO", "AUTOEVALUACION_INSTITUCIONAL"] as const
 
 export const DOCUMENT_CATEGORIES = [
-  ...PEI_PEC_CATEGORIES,
+  "PROYECTO_EDUCATIVO_INSTITUCIONAL",
+  "PROYECTO_EDUCATIVO_COMUNITARIO",
+  ...ANEXOS_PEI_PEC,
   "PLAN_MEJORAMIENTO",
   "PLAN_FORTALECIMIENTO",
   "AUTOEVALUACION_INSTITUCIONAL",
 ] as const
 export type DocumentCategoryCode = (typeof DOCUMENT_CATEGORIES)[number]
 
-/** Qué categorías le corresponden a cada tipo — PEI/PEC comparten las 5 de
- *  siempre, PMI/PFI tienen su plan + "Autoevaluación institucional". */
+/** Qué categorías le corresponden a cada tipo, en el orden en que se
+ *  muestran: siempre el documento principal primero (PEI/PEC: el proyecto
+ *  educativo + sus 5 anexos; PMI/PFI: el plan + "Autoevaluación
+ *  institucional"). */
 export function documentCategoriesForType(type: DocumentType): readonly DocumentCategoryCode[] {
   if (type === "PMI") return PMI_CATEGORIES
   if (type === "PFI") return PFI_CATEGORIES
-  return PEI_PEC_CATEGORIES
+  if (type === "PEC") return PEC_CATEGORIES
+  return PEI_CATEGORIES
 }
 
 /**
  * Categorías que SÍ hacen falta para que el documento quede COMPLETO
  * (V521): de las 5 de PEI/PEC, "Plan escolar de gestión del riesgo" quedó
  * opcional — se puede cargar igual, solo que no bloquea el estado del
- * documento padre. PMI/PFI: su única categoría siempre es obligatoria.
+ * documento padre. El documento principal (V588) siempre es obligatorio.
  */
 export function requiredDocumentCategoriesForType(type: DocumentType): readonly DocumentCategoryCode[] {
   return documentCategoriesForType(type).filter((categoria) => categoria !== "PLAN_GESTION_RIESGO")
@@ -159,6 +171,10 @@ export function requiredDocumentCategoriesForType(type: DocumentType): readonly 
 
 export function documentCategoryDisplayName(categoria: DocumentCategoryCode): string {
   switch (categoria) {
+    case "PROYECTO_EDUCATIVO_INSTITUCIONAL":
+      return "Documento PEI (Proyecto Educativo Institucional)"
+    case "PROYECTO_EDUCATIVO_COMUNITARIO":
+      return "Documento PEC (Proyecto Educativo Comunitario)"
     case "PLAN_ESTUDIOS":
       return "Plan de estudios"
     case "SIEE":
@@ -173,9 +189,9 @@ export function documentCategoryDisplayName(categoria: DocumentCategoryCode): st
       // muestre lo mismo.
       return "Plan escolar de gestión del riesgo (opcional)"
     case "PLAN_MEJORAMIENTO":
-      return "Plan de Mejoramiento Institucional"
+      return "Documento PMI (Plan de Mejoramiento Institucional)"
     case "PLAN_FORTALECIMIENTO":
-      return "Plan de Fortalecimiento Institucional"
+      return "Documento PFI (Plan de Fortalecimiento Institucional)"
     case "AUTOEVALUACION_INSTITUCIONAL":
       return "Autoevaluación institucional (anexo)"
   }

@@ -197,11 +197,11 @@ function DetailContent({
             {badge.label}
           </Badge>
         </SummaryItem>
-        <SummaryItem label="Anexos obligatorios">
+        <SummaryItem label="Archivos obligatorios">
           <div className="flex w-full items-center gap-2">
             <div
               role="progressbar"
-              aria-label="Anexos obligatorios cargados"
+              aria-label="Archivos obligatorios cargados"
               aria-valuemin={0}
               aria-valuemax={total}
               aria-valuenow={done}
