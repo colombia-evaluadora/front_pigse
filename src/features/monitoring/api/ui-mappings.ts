@@ -42,7 +42,7 @@ export function documentStatusBadge(
   const done = state.completedCategories ?? 0
   const total = state.totalCategories ?? 0
   const ratio = total > 0 ? `${done}/${total}` : ""
-  const anexos = total > 0 ? ` (${done} de ${total} anexos obligatorios)` : ""
+  const anexos = total > 0 ? ` (${done} de ${total} archivos obligatorios)` : ""
 
   if (estado === "NO_APLICA") {
     return { label: "No aplica", color: "muted", description: "No aplica a este establecimiento" }
@@ -63,7 +63,7 @@ export function documentStatusBadge(
   return {
     label: ratio ? `Pendiente ${ratio}` : "Pendiente",
     color: "orange",
-    description: `Pendiente: no ha cargado anexos${anexos}`,
+    description: `Pendiente: no ha cargado archivos${anexos}`,
   }
 }
 

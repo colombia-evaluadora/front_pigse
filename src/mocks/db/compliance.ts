@@ -59,8 +59,9 @@ interface SeedCategoria {
   obligatoria: boolean
 }
 
-function peiPecCategorias(): SeedCategoria[] {
+function peiPecCategorias(principal: SeedCategoria): SeedCategoria[] {
   return [
+    principal,
     { codigo: "PLAN_ESTUDIOS", nombre: "Plan de estudios", obligatoria: true },
     { codigo: "MANUAL_CONVIVENCIA", nombre: "Manual de convivencia", obligatoria: true },
     { codigo: "PROYECTOS_TRANSVERSALES", nombre: "Proyectos pedagógicos transversales", obligatoria: true },
@@ -72,14 +73,22 @@ function peiPecCategorias(): SeedCategoria[] {
 const TIPOS: DocumentType[] = ["PEI", "PEC", "PMI", "PFI"]
 
 const CATEGORIAS: Record<DocumentType, SeedCategoria[]> = {
-  PEI: peiPecCategorias(),
-  PEC: peiPecCategorias(),
+  PEI: peiPecCategorias({
+    codigo: "PROYECTO_EDUCATIVO_INSTITUCIONAL",
+    nombre: "Documento PEI (Proyecto Educativo Institucional)",
+    obligatoria: true,
+  }),
+  PEC: peiPecCategorias({
+    codigo: "PROYECTO_EDUCATIVO_COMUNITARIO",
+    nombre: "Documento PEC (Proyecto Educativo Comunitario)",
+    obligatoria: true,
+  }),
   PMI: [
-    { codigo: "PLAN_MEJORAMIENTO", nombre: "Plan de Mejoramiento Institucional", obligatoria: true },
+    { codigo: "PLAN_MEJORAMIENTO", nombre: "Documento PMI (Plan de Mejoramiento Institucional)", obligatoria: true },
     { codigo: "AUTOEVALUACION_INSTITUCIONAL", nombre: "Autoevaluación institucional (anexo)", obligatoria: true },
   ],
   PFI: [
-    { codigo: "PLAN_FORTALECIMIENTO", nombre: "Plan de Fortalecimiento Institucional", obligatoria: true },
+    { codigo: "PLAN_FORTALECIMIENTO", nombre: "Documento PFI (Plan de Fortalecimiento Institucional)", obligatoria: true },
     { codigo: "AUTOEVALUACION_INSTITUCIONAL", nombre: "Autoevaluación institucional (anexo)", obligatoria: true },
   ],
 }

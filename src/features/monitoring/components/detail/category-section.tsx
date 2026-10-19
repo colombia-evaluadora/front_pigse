@@ -64,7 +64,7 @@ export function CategorySection({
           {category.status === "NO_APLICA"
             ? "No aplica a este establecimiento."
             : category.obligatoria
-              ? "El establecimiento todavía no ha cargado este anexo."
+              ? "El establecimiento todavía no ha cargado este archivo."
               : "Sin archivo cargado (no es obligatorio)."}
         </p>
       )}
