@@ -94,13 +94,21 @@ export function useLogout({
   return useMutation({
     mutationFn: logout,
     ...mutationConfig,
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       setAuthToken(null)
+      // Primero se marca "sin usuario" y se deja que el llamador navegue al
+      // login; recién después se vacía el cache. Si se vaciaba antes, las
+      // queries todavía montadas (menú del sidebar, usuario…) se volvían a
+      // pedir SIN token y el backend respondía 401 (`/pigse/my-menus`) —
+      // requests basura en cada logout que la suite E2E marcaba como error.
+      // El `null` en la key del usuario hace que el guard del login no lo
+      // rebote de vuelta a /app.
+      queryClient.setQueryData(USER_QUERY_KEY, null)
+      await mutationConfig?.onSuccess?.(...args)
       // Full clear, not just the user key — otherwise cached protected data
       // (nav menu, ...) stays "fresh" for `staleTime` and could be
       // reused if a different user logs in on the same tab before it expires.
       queryClient.clear()
-      mutationConfig?.onSuccess?.(...args)
     },
   })
 }
