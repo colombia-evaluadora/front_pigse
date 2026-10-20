@@ -1,0 +1,80 @@
+# =============================================================================
+# e2e-test-env.yml — smoke E2E (Playwright) contra el ambiente REAL de test.
+#
+# Es el gate antes de cualquier release a producción: correrlo a mano
+# (Actions → "E2E test env" → Run workflow) después de promover a `test` y
+# antes de tagear `v*`. Hace ESCRITURAS REALES en test (gestión documental).
+# Nunca apunta a producción: `playwright.config.ts` se niega a correr contra
+# un host que no sea `test.*` o localhost.
+#
+# Secretos del repo (Settings → Secrets and variables → Actions), NO se
+# configuran desde acá:
+#   PIGSE_TEST_USER / PIGSE_TEST_PASS               (obligatorios) admin PIGSE
+#   PIGSE_TEST_RECTOR_USER / PIGSE_TEST_RECTOR_PASS (opcionales) cuenta
+#       vinculada a un EE de prueba; sin ellos se saltan las cargas de documentos
+#   PIGSE_TEST_RESET_EMAIL                          (opcional) funcionario de
+#       prueba (@example.com) para "restablecer contraseña"
+# =============================================================================
+
+name: E2E test env
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL del ambiente (solo test.* o localhost)"
+        required: false
+        default: "https://test.pigse.com"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Escriben sobre el mismo EE de prueba: nunca dos corridas a la vez.
+  group: e2e-test-env
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: e2e (test.pigse.com)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      PIGSE_E2E_BASE_URL: ${{ inputs.base_url }}
+      PIGSE_TEST_USER: ${{ secrets.PIGSE_TEST_USER }}
+      PIGSE_TEST_PASS: ${{ secrets.PIGSE_TEST_PASS }}
+      PIGSE_TEST_RECTOR_USER: ${{ secrets.PIGSE_TEST_RECTOR_USER }}
+      PIGSE_TEST_RECTOR_PASS: ${{ secrets.PIGSE_TEST_RECTOR_PASS }}
+      PIGSE_TEST_RESET_EMAIL: ${{ secrets.PIGSE_TEST_RESET_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check secrets
+        run: |
+          if [ -z "$PIGSE_TEST_USER" ] || [ -z "$PIGSE_TEST_PASS" ]; then
+            echo "::error::Faltan los secretos PIGSE_TEST_USER / PIGSE_TEST_PASS"
+            exit 1
+          fi
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E
+        run: pnpm test:e2e:test-env
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

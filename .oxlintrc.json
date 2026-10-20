@@ -11,6 +11,12 @@
       "rules": {
         "react/rules-of-hooks": "off"
       }
+    },
+    {
+      "files": ["e2e/**"],
+      "rules": {
+        "react/rules-of-hooks": "off"
+      }
     }
   ]
 }
