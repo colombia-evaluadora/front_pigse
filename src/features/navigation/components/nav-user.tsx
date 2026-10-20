@@ -23,7 +23,9 @@ export function NavUser() {
     mutationConfig: {
       onSuccess: () => {
         toast.success("Sesión cerrada.")
-        navigate({ to: paths.auth.login.path })
+        // Se devuelve la promesa: `useLogout` espera a estar en el login
+        // antes de vaciar el cache (ver el comentario ahí).
+        return navigate({ to: paths.auth.login.path })
       },
     },
   })
