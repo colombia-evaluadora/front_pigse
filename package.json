@@ -10,6 +10,9 @@
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "preview": "vite preview",
+    "test:e2e:test-env": "playwright test",
+    "test:e2e:test-env:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test-storybook": "test-storybook --url http://localhost:6006",
@@ -55,6 +58,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@chromatic-com/storybook": "^5.2.1",
+    "@playwright/test": "1.61.1",
     "@rolldown/plugin-babel": "^0.2.3",
     "@storybook/addon-a11y": "^10.5.3",
     "@storybook/addon-docs": "^10.5.3",

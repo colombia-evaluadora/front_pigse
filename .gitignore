@@ -33,3 +33,8 @@ storybook-static
 
 # Assets de pdf.js copiados desde node_modules por el plugin de vite.config.ts
 public/pdfjs/
+
+# Playwright (suite E2E contra test)
+test-results/
+playwright-report/
+blob-report/
